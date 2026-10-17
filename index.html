@@ -100,13 +100,18 @@ button:disabled{opacity:.45;cursor:not-allowed}
   border-bottom:1px solid #e2e7e6;margin:-16px -16px 14px;background:#fafbfb}
 .stage .banner svg{width:40px;height:40px;display:none}
 .stage .banner.show svg{display:block}
-.sheet{width:100%;border-collapse:collapse;font-family:var(--font-num);font-size:1.02rem;
-  font-variant-numeric:tabular-nums}
+/* 두 값을 가까이 둔다. 멀리 떨어뜨리면 눈으로 맞대지 못하고 속으로 읽어
+   외운 뒤 비교하게 되어, 지각적 대조가 아니라 언어적 과업이 된다. */
+.sheet{width:auto;margin:0 auto;border-collapse:collapse;font-family:var(--font-num);
+  font-size:1.06rem;font-variant-numeric:tabular-nums}
 .sheet th{font-size:.68rem;letter-spacing:.09em;text-transform:uppercase;color:#6b7572;
-  font-weight:500;padding:5px 10px;border-bottom:1px solid #d6dedc;text-align:left}
-.sheet td{padding:7px 10px;border-bottom:1px solid #eef1f0;letter-spacing:.06em;cursor:pointer}
+  font-weight:500;padding:5px 0 7px;border-bottom:1px solid #d6dedc}
+.sheet td{padding:7px 0;border-bottom:1px solid #eef1f0;letter-spacing:.055em;cursor:pointer}
 .sheet tr:hover td{background:#f2f5f4}
-.sheet td.idx{color:#9aa5a2;font-size:.78rem;width:34px;cursor:default}
+.sheet td.idx{color:#9aa5a2;font-size:.78rem;cursor:default;padding-right:16px;text-align:right}
+.sheet th.a,.sheet td.a{text-align:right;padding-right:calc(var(--gap,2ch) / 2)}
+.sheet th.b,.sheet td.b{text-align:left;padding-left:calc(var(--gap,2ch) / 2);
+  border-left:1px solid #e4e9e8}
 .stage.nopick .sheet td{cursor:default}
 .stage.nopick .sheet tr:hover td{background:transparent}
 .fix{text-align:center;font-size:1.5rem;color:#111;padding:6px 0 2px;font-family:var(--font-num)}
@@ -216,6 +221,7 @@ ul.tight li{margin-bottom:4px}
       <div class="grid three">
         <div><label for="cfgDigits">숫자 자릿수</label><input id="cfgDigits" type="number" value="6" min="3" max="10"></div>
         <div><label for="cfgRows">표의 행 수</label><input id="cfgRows" type="number" value="10" min="4" max="20"></div>
+        <div><label for="cfgGap">두 열 사이 간격 (글자 수)</label><input id="cfgGap" type="number" value="2" step="0.5" min="0" max="12"></div>
         <div><label for="cfgBlock">블록 길이 (초)</label><input id="cfgBlock" type="number" value="90" min="10" max="300"></div>
         <div><label for="cfgAlerts">블록당 알림 수</label><input id="cfgAlerts" type="number" value="12" min="2" max="30"></div>
         <div><label for="cfgGapMin">최소 간격 (초)</label><input id="cfgGapMin" type="number" value="5" step="0.5" min="1"></div>
@@ -502,6 +508,8 @@ function readCfg(){
     learnN:+$('cfgLearnN').value, learnCrit:+$('cfgLearnCrit').value/100, learnMax:3
   };
   if(CFG.gapMax<=CFG.gapMin) CFG.gapMax=CFG.gapMin+1;
+  CFG.colGap=+$('cfgGap').value;
+  $('stage').style.setProperty('--gap', CFG.colGap+'ch');
   TONESET=$('cfgTone').value;
   CFG.toneset=TONESET;
   const n=CFG.nAlerts, w=Math.floor(n/2), p=n-w, odd=(n%2!==0);
@@ -631,15 +639,15 @@ function startBlock(opts){
 function nextTable(){
   if(!RUN.cond.primary){
     const n=CFG.rows, neutral='○'.repeat(CFG.digits);
-    let h='<table class="sheet"><thead><tr><th></th><th>원본</th><th>입력본</th></tr></thead><tbody>';
-    for(let i=0;i<n;i++) h+='<tr><td class="idx">'+(i+1)+'</td><td>'+neutral+'</td><td>'+neutral+'</td></tr>';
+    let h='<table class="sheet"><thead><tr><th></th><th class="a">원본</th><th class="b">입력본</th></tr></thead><tbody>';
+    for(let i=0;i<n;i++) h+='<tr><td class="idx">'+(i+1)+'</td><td class="a">'+neutral+'</td><td class="b">'+neutral+'</td></tr>';
     $('sheetHost').innerHTML=h+'</tbody></table>';
     return;
   }
   const t=makeTable(RUN.rng); RUN.tbl=t; RUN.tableT=performance.now();
-  let h='<table class="sheet"><thead><tr><th></th><th>원본</th><th>입력본</th></tr></thead><tbody>';
+  let h='<table class="sheet"><thead><tr><th></th><th class="a">원본</th><th class="b">입력본</th></tr></thead><tbody>';
   for(let i=0;i<t.left.length;i++)
-    h+='<tr data-i="'+i+'"><td class="idx">'+(i+1)+'</td><td>'+t.left[i]+'</td><td>'+t.right[i]+'</td></tr>';
+    h+='<tr data-i="'+i+'"><td class="idx">'+(i+1)+'</td><td class="a">'+t.left[i]+'</td><td class="b">'+t.right[i]+'</td></tr>';
   $('sheetHost').innerHTML=h+'</tbody></table>';
   $('sheetHost').querySelectorAll('tr[data-i]').forEach(tr=>{
     tr.addEventListener('click',()=>onRowClick(+tr.dataset.i));
@@ -998,7 +1006,7 @@ function buildCsv(agg, derived){
     청각학습블록:(learnState.acc.audio||{}).blocks??'', 청각학습정확도:(learnState.acc.audio||{}).acc??'',
     알림음설계:(TONESETS[CFG.toneset]||{}).label||CFG.toneset,
     숫자자릿수:CFG.digits, 표행수:CFG.rows, 블록길이s:CFG.blockMs/1000,
-    블록당알림:CFG.nAlerts, 응답제한s:CFG.respMs/1000,
+    블록당알림:CFG.nAlerts, 응답제한s:CFG.respMs/1000, 두열간격ch:CFG.colGap,
     실험일시:P.started, 실험자:P.experimenter
   }]);
   CSV['표 D2 블록별 기록']=toCsv(blocks.map(b=>({
