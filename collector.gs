@@ -81,12 +81,30 @@ function appendTables(ss, run) {
       sh.appendRow(header);
       sh.setFrozenRows(1);
     }
+
+    // 자리가 아니라 '이름'으로 열을 맞춘다. 먼저 도착한 자료의 열 구성이
+    // 달라도 값이 엉뚱한 칸에 들어가지 않는다.
+    var width = Math.max(sh.getLastColumn(), 1);
+    var titles = sh.getRange(1, 1, 1, width).getValues()[0].map(function (v) { return String(v); });
+    var at = {};
+    titles.forEach(function (t, i) { if (t !== '') at[t] = i; });
+
+    var grew = false;
+    header.forEach(function (t) {
+      if (!(t in at)) { titles.push(t); at[t] = titles.length - 1; grew = true; }
+    });
+    if (grew) {
+      sh.getRange(1, 1, 1, titles.length).setValues([titles]);
+      sh.setFrozenRows(1);
+    }
+
     var body = rows.slice(1).map(function (r) {
-      var out = r.slice(0, header.length);
-      while (out.length < header.length) out.push('');
+      var out = [];
+      for (var i = 0; i < titles.length; i++) out.push('');
+      header.forEach(function (t, i) { out[at[t]] = (i < r.length) ? r[i] : ''; });
       return out;
     });
-    sh.getRange(sh.getLastRow() + 1, 1, body.length, header.length).setValues(body);
+    sh.getRange(sh.getLastRow() + 1, 1, body.length, titles.length).setValues(body);
   });
 }
 
