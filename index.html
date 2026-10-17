@@ -230,6 +230,7 @@ ul.tight li{margin-bottom:4px}
         <div><label for="cfgRestB">블록 간 휴식 (초)</label><input id="cfgRestB" type="number" value="20" min="0"></div>
         <div><label for="cfgRestC">조건 간 휴식 (초)</label><input id="cfgRestC" type="number" value="60" min="0"></div>
         <div><label for="cfgPractice">연습 블록 수</label><input id="cfgPractice" type="number" value="2" min="0" max="4"></div>
+        <div><label for="cfgCondPractice">조건별 연습 (초)</label><input id="cfgCondPractice" type="number" value="30" min="0" max="120"></div>
         <div><label for="cfgLearnN">학습 문항/블록</label><input id="cfgLearnN" type="number" value="24" min="4" max="60"></div>
         <div><label for="cfgLearnCrit">학습 통과 기준 (%)</label><input id="cfgLearnCrit" type="number" value="90" min="50" max="100"></div>
       </div>
@@ -281,6 +282,7 @@ ul.tight li{margin-bottom:4px}
       <div class="note warn"><b>우선순위.</b> 대조 검증을 최우선으로 수행하되, 알림은 <b>하나도 놓치지 말고</b> 가능한 한 빠르고 정확하게 분류하세요.</div>
       <p><b>손 배치.</b> 주 과업은 마우스를 쥔 우세손으로, 알림 분류는 <b>비우세손의 방향키</b>로 수행합니다. 실험 내내 이 배치를 유지하세요.</p>
       <p><b>알림만 제시되는 블록</b>에서는 숫자 대신 중립 기호가 채워진 격자가 나옵니다. 이때는 클릭하지 말고 <b>화면 중앙을 응시</b>한 채 알림에만 반응하세요.</p>
+      <p><b>조건이 바뀔 때마다</b> 먼저 30초 연습을 합니다. 이때는 기록하지 않으니, 알림이 어디에 뜨고 두 과업을 어떻게 번갈아 할지 익히는 데 쓰세요. 화면에 '연습 — 기록하지 않습니다'라고 표시됩니다.</p>
       <div class="keys"><span class="key">← 업무 알림</span><span class="key">→ 광고 알림</span></div>
       <div class="note warn" id="modeNote" hidden></div>
     </div>
@@ -504,7 +506,7 @@ function readCfg(){
     gapMin:+$('cfgGapMin').value, gapMax:+$('cfgGapMax').value,
     respMs:+$('cfgResp').value*1000,
     restBlock:+$('cfgRestB').value, restCond:+$('cfgRestC').value,
-    practice:+$('cfgPractice').value,
+    practice:+$('cfgPractice').value, condPractice:+$('cfgCondPractice').value,
     learnN:+$('cfgLearnN').value, learnCrit:+$('cfgLearnCrit').value/100, learnMax:3
   };
   if(CFG.gapMax<=CFG.gapMin) CFG.gapMax=CFG.gapMin+1;
@@ -621,20 +623,25 @@ function startBlock(opts){
   RUN={
     ...opts, cond, condName:opts.cond,
     t0:performance.now(), done:0, misclicks:0, tableT:performance.now(),
+    ms: opts.ms || CFG.blockMs,
     tableTimes:[], alertIdx:0, pending:null, rng,
     order:makeOrder(mulberry32(31337+opts.setIdx*101+(P.seq||1))),
-    alerts:[], raf:0, tbl:null
+    alerts:[], timer:0, hiddenMs:0, tbl:null
   };
   show('s-run');
-  $('runTitle').textContent = opts.practice ? '주 과업 연습' : ('조건 '+opts.cond+' — '+cond.name);
+  const warm=!!opts.warmup;
+  $('runTitle').textContent = opts.practice ? '주 과업 연습'
+    : ('조건 '+opts.cond+(warm?' 연습':'')+' — '+cond.name);
   $('runTag').textContent = opts.practice ? ('연습 '+opts.blockNo+'/'+CFG.practice)
-    : ('블록 '+opts.blockNo+'/'+((MAIN.order&&MAIN.order.length)?MAIN.order.length*2:10)+' · 자극 세트 S'+opts.setIdx);
+    : (warm ? '연습 — 기록하지 않습니다'
+            : ('블록 '+opts.blockNo+'/'+((MAIN.order&&MAIN.order.length)?MAIN.order.length*2:10)+' · 자극 세트 S'+opts.setIdx));
   $('stage').classList.toggle('nopick', !cond.primary);
   $('fix').hidden = cond.primary;
   $('banner').classList.remove('show'); $('banner').innerHTML='';
   $('mDone').textContent='0'; $('mMiss').textContent='0'; $('mAlert').textContent='0';
   nextTable();
   tick();
+  RUN.timer=setInterval(tick,25);
 }
 function nextTable(){
   if(!RUN.cond.primary){
@@ -662,11 +669,18 @@ function onRowClick(i){
     RUN.misclicks++; $('mMiss').textContent=RUN.misclicks; // 시각 피드백 없음
   }
 }
+let HIDDEN_AT=null;
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){ HIDDEN_AT=performance.now(); return; }
+  if(HIDDEN_AT!=null && RUN) RUN.hiddenMs=(RUN.hiddenMs||0)+(performance.now()-HIDDEN_AT);
+  HIDDEN_AT=null;
+});
+
 function tick(){
   if(!RUN) return;
-  const el=performance.now()-RUN.t0, left=Math.max(0,CFG.blockMs-el);
+  const el=performance.now()-RUN.t0, left=Math.max(0,RUN.ms-el);
   $('mTime').textContent=(left/1000).toFixed(1);
-  $('barFill').style.width=(100*Math.min(1,el/CFG.blockMs))+'%';
+  $('barFill').style.width=(100*Math.min(1,el/RUN.ms))+'%';
 
   if(RUN.cond.alert && RUN.alertIdx<schedule.length && el>=schedule[RUN.alertIdx]){
     presentAlert(RUN.alertIdx, el); RUN.alertIdx++;
@@ -675,7 +689,6 @@ function tick(){
     closeAlert(null,null);
   }
   if(left<=0){ endBlock(); return; }
-  RUN.raf=requestAnimationFrame(tick);
 }
 function presentAlert(i, el){
   const id=RUN.order[i%RUN.order.length];
@@ -710,7 +723,7 @@ function onKey(e){
 window.addEventListener('keydown',onKey,{passive:false});
 
 function endBlock(){
-  cancelAnimationFrame(RUN.raf);
+  clearInterval(RUN.timer);
   if(RUN.pending) closeAlert(null,null);
   const times=RUN.tableTimes;
   const rec={
@@ -722,9 +735,12 @@ function endBlock(){
     correct:RUN.alerts.filter(a=>a.outcome==='정답').length,
     wrong:RUN.alerts.filter(a=>a.outcome==='오답').length,
     missed:RUN.alerts.filter(a=>a.outcome==='무응답').length,
-    meanRt: meanRt(RUN.alerts)
+    meanRt: meanRt(RUN.alerts),
+    hiddenMs: Math.round(RUN.hiddenMs||0)
   };
-  if(RUN.practice) practiceLog.push(rec); else { blocks.push(rec); trials.push(...RUN.alerts); }
+  if(RUN.warmup){ /* 조건별 연습 — 기록하지 않는다 */ }
+  else if(RUN.practice) practiceLog.push(rec);
+  else { blocks.push(rec); trials.push(...RUN.alerts); }
   const finished=RUN;
   RUN=null;
   advance(finished);
@@ -831,13 +847,22 @@ function beginMain(){
   const ord = (MODE==='balance')
     ? (P.seq%2===1 ? ['B','C'] : ['C','B'])
     : WILLIAMS[P.seq-1];
-  MAIN={condIdx:0, blockInCond:0, blockNo:0, order:ord};
+  MAIN={condIdx:0, blockInCond:0, blockNo:0, order:ord, warmed:false};
   setRail('본 시행');
   runNextMainBlock();
 }
 function runNextMainBlock(){
-  MAIN.blockNo++; MAIN.blockInCond++;
   const c=MAIN.order[MAIN.condIdx];
+  // 조건마다 측정 전에 짧은 연습을 둔다(그림 1의 '조건별 연습 30초').
+  // 알림이 화면 어디에 뜨는지, 두 과업을 어떻게 번갈아 하는지 미리 겪게 해
+  // 첫 블록에서 헤매는 것을 막는다. 조건 순서는 Williams 설계 그대로 둔다.
+  if(MAIN.blockInCond===0 && CFG.condPractice>0 && !MAIN.warmed){
+    MAIN.warmed=true;
+    startBlock({cond:c, setIdx:700+MAIN.condIdx, blockNo:0, practice:false,
+                warmup:true, ms:CFG.condPractice*1000});
+    return;
+  }
+  MAIN.blockNo++; MAIN.blockInCond++;
   startBlock({cond:c, setIdx:MAIN.blockNo, blockNo:MAIN.blockNo, practice:false});
 }
 function advance(fin){
@@ -853,6 +878,12 @@ function advance(fin){
         ()=>{ learnState={order:(P.seq%2===1?['visual','audio']:['audio','visual']), done:0, acc:{}};
               startLearn(learnState.order[0],1); });
     }
+    return;
+  }
+  if(fin.warmup){
+    rest(Math.min(5,CFG.restBlock), '조건 '+fin.condName+' 연습 종료',
+      '이제 같은 조건으로 측정 블록을 시작합니다. 여기서부터 기록됩니다.',
+      runNextMainBlock);
     return;
   }
   if(MAIN.blockInCond<2){
@@ -880,7 +911,7 @@ function askTlx(cond){
     TLX_ITEMS.forEach(it=>{const v=+$('r_'+it.k).value; vals[it.k]=v; sum+=v;});
     vals.mean=+(sum/6).toFixed(2);
     tlx[cond]=vals;
-    MAIN.condIdx++; MAIN.blockInCond=0;
+    MAIN.condIdx++; MAIN.blockInCond=0; MAIN.warmed=false;
     if(MAIN.condIdx>=MAIN.order.length){ finish(); }
     else rest(CFG.restCond,'조건 간 휴식',
       '다음 조건은 '+MAIN.order[MAIN.condIdx]+' ('+COND[MAIN.order[MAIN.condIdx]].name+')입니다.',
@@ -1012,7 +1043,8 @@ function buildCsv(agg, derived){
   CSV['표 D2 블록별 기록']=toCsv(blocks.map(b=>({
     참가자ID:b.pid, 블록:b.block, 조건:b.cond, 자극세트:'S'+b.set,
     처리량:b.throughput, 오클릭:b.misclicks, 표당소요s:b.secPerTable,
-    알림제시:b.presented, 분류정답:b.correct, 분류오답:b.wrong, 무응답:b.missed, 평균반응시간s:b.meanRt
+    알림제시:b.presented, 분류정답:b.correct, 분류오답:b.wrong, 무응답:b.missed, 평균반응시간s:b.meanRt,
+    창전환ms:b.hiddenMs
   })));
   CSV['표 D3 조건별 RTLX']=toCsv(['A','B','C','D','E'].filter(c=>tlx[c]).map(c=>({
     참가자ID:P.pid, 조건:c, 정신적요구:tlx[c].mental, 신체적요구:tlx[c].physical,
