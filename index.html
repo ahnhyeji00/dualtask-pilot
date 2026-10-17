@@ -244,7 +244,7 @@ ul.tight li{margin-bottom:4px}
       <h2>파일럿 조정값</h2>
       <p class="lede"><small>부록 B에 따라 자릿수와 행 수를 조정해 90초당 처리량이 6–10개에 들어오도록 맞춥니다.</small></p>
       <div class="grid three">
-        <div><label for="cfgDigits">숫자 자릿수</label><input id="cfgDigits" type="number" value="6" min="3" max="10"></div>
+        <div><label for="cfgDigits">숫자 자릿수</label><input id="cfgDigits" type="number" value="8" min="3" max="14"></div>
         <div><label for="cfgRows">표의 행 수</label><input id="cfgRows" type="number" value="10" min="4" max="20"></div>
         <div><label for="cfgGap">두 열 사이 간격 (글자 수)</label><input id="cfgGap" type="number" value="2" step="0.5" min="0" max="12"></div>
         <div><label for="cfgBlock">블록 길이 (초)</label><input id="cfgBlock" type="number" value="90" min="10" max="300"></div>
@@ -610,10 +610,11 @@ function makeTable(r){
     if(s[0]==='0') s='1'+s.slice(1);
     left.push(s); right.push(s);
   }
-  // 불일치 행은 1..n, 불일치 자릿수는 둘째~다섯째 자리에 배치
+  // 불일치 행은 1..n 에 고루, 불일치 자리는 첫 자리와 끝 자리를 뺀 안쪽에 둔다.
+  // 양끝은 눈에 너무 잘 띄기 때문이다(여섯 자리면 둘째~다섯째로 부록 B 와 같다).
   const row=Math.floor(r()*n);
-  const maxPos=Math.min(d-1,4);
-  const pos=1+Math.floor(r()*Math.max(1,maxPos));
+  const span=Math.max(1,d-2);
+  const pos=1+Math.floor(r()*span);
   const old=+left[row][pos];
   let nd=Math.floor(r()*10); if(nd===old) nd=(old+1+Math.floor(r()*9))%10;
   right[row]=right[row].slice(0,pos)+nd+right[row].slice(pos+1);
@@ -1357,7 +1358,7 @@ $('btnSaveJson').onclick=()=>{ if(LAST) download(fileStem()+'.json', JSON.string
   // 설정을 다시 읽고 버튼에 적용 사실을 잠깐 표시한다.
   const QUICK={cfgBlock:20, cfgAlerts:4, cfgGapMin:3, cfgGapMax:5, cfgResp:2,
                cfgRestB:3, cfgRestC:5, cfgPractice:1, cfgCondPractice:5, cfgLearnN:8};
-  const DEFAULTS={cfgIconPos:'right', cfgDigits:6, cfgRows:10, cfgGap:2, cfgBlock:90, cfgAlerts:12,
+  const DEFAULTS={cfgIconPos:'right', cfgDigits:8, cfgRows:10, cfgGap:2, cfgBlock:90, cfgAlerts:12,
                   cfgGapMin:5, cfgGapMax:9, cfgResp:3, cfgRestB:20, cfgRestC:60,
                   cfgPractice:2, cfgCondPractice:30, cfgLearnN:24, cfgLearnCrit:90};
   function applyPreset(map, btn, label){
