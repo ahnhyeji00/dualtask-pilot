@@ -328,6 +328,13 @@ ul.tight li{margin-bottom:4px}
 
       <div class="note warn"><b>우선순위 — 대조 검증이 먼저입니다.</b> 다만 알림은 <b>하나도 놓치지 마세요.</b></div>
 
+      <div class="note warn"><b>알림만 나오는 블록 — 반드시 가운데 ＋를 보세요.</b><br>
+      숫자 대신 ○ 기호가 채워진 격자가 뜹니다. 이때는 <b>클릭하지 말고</b>, 화면 한가운데의
+      <b>＋ 표시에 시선을 고정한 채</b> 알림에만 반응하세요.
+      <b>아이콘이 뜰 자리를 미리 쳐다보고 기다리면 안 됩니다.</b>
+      그렇게 하면 알림을 실제보다 빨리 알아채게 되어, 두 과업을 함께 할 때와 비교할 수
+      없는 기록이 남습니다.</div>
+
       <h3>진행 순서</h3>
       <ol class="steps">
         <li><b>주 과업 연습</b> — 대조 검증에만 익숙해집니다</li>
@@ -342,7 +349,7 @@ ul.tight li{margin-bottom:4px}
       <ul class="tight">
         <li>이어폰을 착용하고 음량을 미리 맞추세요</li>
         <li>실험 도중 <b>다른 창이나 탭으로 전환하지 마세요</b> — 전환 시간이 기록됩니다</li>
-        <li>알림만 나오는 블록에서는 숫자 대신 기호 격자가 뜹니다. 클릭하지 말고 <b>화면 중앙을 응시</b>하세요</li>
+        <li>실험 중 <b>자세와 화면까지의 거리를 일정하게</b> 유지하세요</li>
       </ul>
 
       <div class="note warn" id="modeNote" hidden></div>
@@ -364,6 +371,9 @@ ul.tight li{margin-bottom:4px}
         <div class="banner" id="banner"></div>
         <div id="sheetHost"></div>
         <div class="fix" id="fix" hidden>＋</div>
+      </div>
+      <div class="note warn" id="fixHint" hidden><b>가운데 ＋를 응시한 채</b> 알림에만 반응하세요. 클릭하지 않습니다.</div>
+      <div hidden>
       </div>
       <div class="bar"><i id="barFill"></i></div>
       <div class="meters">
@@ -601,7 +611,22 @@ function readP(){
 }
 
 /* ════════════ 주 과업 자극 ════════════ */
-function makeTable(r){
+/* 불일치 행 고르기. 그냥 무작위로 뽑으면 같은 행이 잇따라 나오고 어떤 행은
+   한참 안 나온다. 부록 B 가 '불일치 행은 첫째에서 열째 행에 균형 배치한다'고
+   했으므로, 행을 한 번씩 쓰는 묶음을 섞어 쓰고 묶음이 바뀌는 자리에서만
+   앞 표와 같아지지 않도록 한 번 더 손본다. */
+function pickRow(r, st, n){
+  if(!st.bag.length){
+    st.bag=shuffle(r, Array.from({length:n},(_,i)=>i));
+    if(n>1 && st.bag[0]===st.last){
+      const j=1+Math.floor(r()*(n-1));
+      [st.bag[0],st.bag[j]]=[st.bag[j],st.bag[0]];
+    }
+  }
+  st.last=st.bag.shift();
+  return st.last;
+}
+function makeTable(r, st){
   const d=CFG.digits, n=CFG.rows;
   const left=[], right=[];
   for(let i=0;i<n;i++){
@@ -612,7 +637,7 @@ function makeTable(r){
   }
   // 불일치 행은 1..n 에 고루, 불일치 자리는 첫 자리와 끝 자리를 뺀 안쪽에 둔다.
   // 양끝은 눈에 너무 잘 띄기 때문이다(여섯 자리면 둘째~다섯째로 부록 B 와 같다).
-  const row=Math.floor(r()*n);
+  const row=pickRow(r, st, n);
   const span=Math.max(1,d-2);
   const pos=1+Math.floor(r()*span);
   const old=+left[row][pos];
@@ -703,6 +728,7 @@ function startBlock(opts){
     ms: opts.ms || CFG.blockMs,
     tableTimes:[], alertIdx:0, pending:null, rng,
     order:makeOrder(mulberry32(31337+opts.setIdx*101+(P.seq||1))),
+    rowState:{bag:[], last:-1},
     alerts:[], timer:0, hiddenMs:0, tbl:null
   };
   show('s-run');
@@ -714,6 +740,7 @@ function startBlock(opts){
             : ('블록 '+opts.blockNo+'/'+((MAIN.order&&MAIN.order.length)?MAIN.order.length*2:10)+' · 자극 세트 S'+opts.setIdx));
   $('stage').className='stage pos-'+(CFG.iconPos||'top')+(cond.primary?'':' nopick');
   $('fix').hidden = cond.primary;
+  $('fixHint').hidden = cond.primary;
   $('banner').classList.remove('show'); $('banner').innerHTML='';
   $('mDone').textContent='0'; $('mMiss').textContent='0'; $('mAlert').textContent='0';
   nextTable();
@@ -728,7 +755,7 @@ function nextTable(){
     $('sheetHost').innerHTML=h+'</tbody></table>';
     return;
   }
-  const t=makeTable(RUN.rng); RUN.tbl=t; RUN.tableT=performance.now();
+  const t=makeTable(RUN.rng, RUN.rowState); RUN.tbl=t; RUN.tableT=performance.now();
   let h='<table class="sheet"><thead><tr><th></th><th class="a">원본</th><th class="b">입력본</th></tr></thead><tbody>';
   for(let i=0;i<t.left.length;i++)
     h+='<tr data-i="'+i+'"><td class="idx">'+(i+1)+'</td><td class="a">'+t.left[i]+'</td><td class="b">'+t.right[i]+'</td></tr>';
