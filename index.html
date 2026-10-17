@@ -1081,7 +1081,7 @@ $('btnHistBack').onclick=()=>show('s-setup');
 /* ════════════ 결과 내보내기 / 선택적 서버 전송 ════════════ */
 let RUNS=[], ENDPOINT='';
 /* 구글 Apps Script 웹앱 주소를 여기에 넣으면 모든 사람이 자동으로 쓰게 된다. */
-const DEFAULT_ENDPOINT='';
+const DEFAULT_ENDPOINT='https://script.google.com/macros/s/AKfycbyu5_sOyMcpNEYZpzVm49Dfl1W5Cy1iFEGUgAJWGwlaJMPB5JzN_SRcGMXLOiUD2k-MMg/exec';
 const MERGE_KEYS=['표 D1 참가자 정보','표 D2 블록별 기록','표 D3 조건별 RTLX',
                   '표 D4 파생값','알림 시행 로그','학습 로그'];
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
