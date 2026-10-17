@@ -262,11 +262,12 @@ ul.tight li{margin-bottom:4px}
       <div style="margin-top:12px">
         <label for="cfgIconPos">시각 알림 위치</label>
         <select id="cfgIconPos">
-          <option value="top">화면 상단 배너 (보고서 3.2절)</option>
-          <option value="right">표 오른쪽</option>
+          <option value="right">표 오른쪽 (기본)</option>
           <option value="left">표 왼쪽</option>
+          <option value="top">화면 상단 배너 — 보고서 3.2절 표기</option>
         </select>
       </div>
+      <div class="note warn" id="posNote"></div>
       <div style="margin-top:12px">
         <label for="cfgTone">알림음 설계</label>
         <select id="cfgTone">
@@ -322,7 +323,7 @@ ul.tight li{margin-bottom:4px}
       <h3>두 과업</h3>
       <table class="brief">
         <tr><th>주 과업</th><td>원본과 입력본 중 <b>좌우 값이 다른 한 행</b>을 클릭. 맞히면 바로 다음 표가 나오고, 틀리면 아무 표시 없이 그대로입니다.</td></tr>
-        <tr><th>보조 과업</th><td>알림이 <b>0.5초</b> 제시됩니다. <b>업무 ←</b>, <b>광고 →</b>. 응답 시간 <span class="respEcho">3</span>초.</td></tr>
+        <tr><th>보조 과업</th><td>알림이 <b>0.5초</b> 제시됩니다. <b>업무 ←</b>, <b>광고 →</b>. 응답 시간 <span class="respEcho">3</span>초. 아이콘은 <b id="posEcho">표 오른쪽</b>에 뜹니다.</td></tr>
       </table>
 
       <div class="note warn"><b>우선순위 — 대조 검증이 먼저입니다.</b> 다만 알림은 <b>하나도 놓치지 마세요.</b></div>
@@ -574,6 +575,9 @@ function readCfg(){
   CFG.colGap=+$('cfgGap').value;
   CFG.iconPos=$('cfgIconPos').value;
   $('stage').className='stage pos-'+CFG.iconPos;
+  $('posNote').innerHTML = (CFG.iconPos==='top')
+    ? '상단 배너는 보고서 3.2절 표기 그대로입니다. 다만 표가 길면 아래쪽 행을 볼 때 아이콘이 시야에서 멀어져, <b>못 봐서 늦은 것이 시각 양식 탓으로</b> 잡힐 수 있습니다.'
+    : '아이콘을 표 옆에 두어 어느 행을 보든 거리가 비슷하게 맞췄습니다. 보고서 3.2절에는 ‘화면 상단 배너’로 적혀 있으므로, <b>본보고서에 위치를 바꾼 사실과 이유를 적어야 합니다.</b>';
   $('stage').style.setProperty('--gap', CFG.colGap+'ch');
   TONESET=$('cfgTone').value;
   CFG.toneset=TONESET;
@@ -1353,7 +1357,7 @@ $('btnSaveJson').onclick=()=>{ if(LAST) download(fileStem()+'.json', JSON.string
   // 설정을 다시 읽고 버튼에 적용 사실을 잠깐 표시한다.
   const QUICK={cfgBlock:20, cfgAlerts:4, cfgGapMin:3, cfgGapMax:5, cfgResp:2,
                cfgRestB:3, cfgRestC:5, cfgPractice:1, cfgCondPractice:5, cfgLearnN:8};
-  const DEFAULTS={cfgDigits:6, cfgRows:10, cfgGap:2, cfgBlock:90, cfgAlerts:12,
+  const DEFAULTS={cfgIconPos:'right', cfgDigits:6, cfgRows:10, cfgGap:2, cfgBlock:90, cfgAlerts:12,
                   cfgGapMin:5, cfgGapMax:9, cfgResp:3, cfgRestB:20, cfgRestC:60,
                   cfgPractice:2, cfgCondPractice:30, cfgLearnN:24, cfgLearnCrit:90};
   function applyPreset(map, btn, label){
@@ -1365,7 +1369,8 @@ $('btnSaveJson').onclick=()=>{ if(LAST) download(fileStem()+'.json', JSON.string
   }
   $('btnQuick').onclick=()=>applyPreset(QUICK, $('btnQuick'), '적용했습니다');
   $('btnDefaults').onclick=()=>applyPreset(DEFAULTS, $('btnDefaults'), '되돌렸습니다');
-  ['cfgTone','cfgAlerts','cfgResp','cfgBlock'].forEach(id=>{
+  ['cfgTone','cfgIconPos','cfgAlerts','cfgResp','cfgBlock','cfgGap','cfgRows','cfgDigits']
+    .forEach(id=>{
     $(id).addEventListener('input',readCfg); $(id).addEventListener('change',readCfg);
   });
   $('btnSound').onclick=()=>{
@@ -1384,6 +1389,7 @@ $('btnSaveJson').onclick=()=>{ if(LAST) download(fileStem()+'.json', JSON.string
     if(bal) $('modeNote').innerHTML='<b>파일럿 3단계 — 양식 균형 점검</b>입니다. 알림만 제시되는 두 조건(B 시각 단독, C 청각 단독)을 '+
       '두 블록씩 수행하며, 주 과업이 들어가는 A·D·E는 하지 않습니다. 따라서 본 시행에서는 <b>숫자 대조를 하지 않고</b> 중립 기호 격자의 '+
       '중앙을 응시한 채 알림에만 반응합니다.';
+    $('posEcho').textContent = {top:'화면 위쪽 배너', left:'표 왼쪽', right:'표 오른쪽'}[CFG.iconPos] || '표 오른쪽';
     $('btnToPractice').textContent = (CFG.practice>0) ? '주 과업 연습 시작' : '알림 학습 시작';
     show('s-instr'); setRail('지시문');
   };
