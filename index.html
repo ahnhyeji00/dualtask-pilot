@@ -250,6 +250,7 @@ ul.tight li{margin-bottom:4px}
       <h3>점검용</h3>
       <div class="row">
         <button id="btnQuick">짧게 설정 (페이지 작동 확인용)</button>
+        <button id="btnDefaults">기본값으로</button>
         <button id="btnSound">알림음 4종 들어보기</button>
         <button id="btnCloud">결과 모아 보기</button>
         <button id="btnRestore">이 기기 기록</button>
@@ -1270,10 +1271,22 @@ $('btnSaveJson').onclick=()=>{ if(LAST) download(fileStem()+'.json', JSON.string
     o.value=i+1; o.textContent='Q'+(i+1)+' — '+w.join(' · ');
     sel.appendChild(o);
   });
-  $('btnQuick').onclick=()=>{
-    $('cfgBlock').value=20; $('cfgAlerts').value=4; $('cfgGapMin').value=3; $('cfgGapMax').value=5;
-    $('cfgRestB').value=3; $('cfgRestC').value=5; $('cfgPractice').value=1; $('cfgLearnN').value=8;
-  };
+  // 값만 바꾸면 아래 안내문이 옛 숫자를 그대로 띄워 눌리지 않은 것처럼 보인다.
+  // 설정을 다시 읽고 버튼에 적용 사실을 잠깐 표시한다.
+  const QUICK={cfgBlock:20, cfgAlerts:4, cfgGapMin:3, cfgGapMax:5, cfgResp:2,
+               cfgRestB:3, cfgRestC:5, cfgPractice:1, cfgCondPractice:5, cfgLearnN:8};
+  const DEFAULTS={cfgDigits:6, cfgRows:10, cfgGap:2, cfgBlock:90, cfgAlerts:12,
+                  cfgGapMin:5, cfgGapMax:9, cfgResp:3, cfgRestB:20, cfgRestC:60,
+                  cfgPractice:2, cfgCondPractice:30, cfgLearnN:24, cfgLearnCrit:90};
+  function applyPreset(map, btn, label){
+    Object.keys(map).forEach(k=>{ $(k).value=map[k]; });
+    readCfg();
+    const was=btn.textContent;
+    btn.textContent=label;
+    setTimeout(()=>{ btn.textContent=was; }, 1400);
+  }
+  $('btnQuick').onclick=()=>applyPreset(QUICK, $('btnQuick'), '적용했습니다');
+  $('btnDefaults').onclick=()=>applyPreset(DEFAULTS, $('btnDefaults'), '되돌렸습니다');
   ['cfgTone','cfgAlerts','cfgResp','cfgBlock'].forEach(id=>{
     $(id).addEventListener('input',readCfg); $(id).addEventListener('change',readCfg);
   });
