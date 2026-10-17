@@ -1,0 +1,1276 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>알림 양식 이중과업 실험</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
+<style>
+/* 독립 실행용 기본 재설정 */
+:root{color-scheme:light}
+img{max-width:100%}
+[hidden]{display:none!important}
+code{font-family:var(--font-num);font-size:.92em}
+input[type=file]{background:transparent;border:0;padding:0;font-size:.85rem}
+
+/* Layout: 좌측 상태 레일 + 중앙 단일 스테이지. 자극 표시면(.stage)은 조건 간 밝기를 표준화해야 하므로 테마와 무관하게 고정 흰 바탕이다. */
+:root{
+  --paper:#f3f6f5; --panel:#ffffff; --sunk:#e9efed;
+  --ink:#131a1c; --muted:#5a6a6e; --faint:#869599;
+  --line:#d3dcda; --line-hard:#b6c4c1;
+  --accent:#0d6b61; --accent-soft:#dbecea;
+  --good:#1d6b3c; --warn:#8a5600; --bad:#9a2b2b; --on-accent:#ffffff;
+  --font-ui:"IBM Plex Sans KR","Malgun Gothic","맑은 고딕",system-ui,sans-serif;
+  --font-num:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#0e1413; --panel:#161d1c; --sunk:#111817;
+  --ink:#e7eeec; --muted:#95a5a2; --faint:#6f8080;
+  --line:#28322f; --line-hard:#3a4844;
+  --accent:#4ed4c0; --accent-soft:#143029;
+  --good:#6fd396; --warn:#e2ab52; --bad:#ef8b8b; --on-accent:#06211e;
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --paper:#0e1413; --panel:#161d1c; --sunk:#111817;
+  --ink:#e7eeec; --muted:#95a5a2; --faint:#6f8080;
+  --line:#28322f; --line-hard:#3a4844;
+  --accent:#4ed4c0; --accent-soft:#143029;
+  --good:#6fd396; --warn:#e2ab52; --bad:#ef8b8b; --on-accent:#06211e;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:var(--font-ui); font-size:15px; line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:0;
+}
+.wrap{max-width:860px;margin:0 auto;padding-block:20px 48px}
+h1{font-size:1.25rem;font-weight:600;margin:0;letter-spacing:-.01em;text-wrap:balance}
+h2{font-size:1.02rem;font-weight:600;margin:0 0 10px;text-wrap:balance}
+h3{font-size:.82rem;font-weight:600;margin:0 0 8px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+p{margin:0 0 10px}
+.lede{color:var(--muted)}
+small{font-size:.8rem}
+
+/* 머리글 */
+.top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:20px}
+.badge{font-family:var(--font-num);font-size:.72rem;letter-spacing:.08em;color:var(--muted);
+  border:1px solid var(--line);border-radius:999px;padding:2px 9px}
+
+/* 카드 */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:14px}
+.card.flat{background:transparent;border-style:dashed}
+
+/* 폼 */
+.grid{display:grid;gap:12px}
+@media(min-width:620px){.grid.two{grid-template-columns:1fr 1fr}.grid.three{grid-template-columns:repeat(3,1fr)}}
+label{display:block;font-size:.8rem;font-weight:500;color:var(--muted);margin-bottom:4px}
+input,select,textarea{width:100%;min-width:0;font-family:inherit;font-size:.92rem;color:var(--ink);
+  background:var(--sunk);border:1px solid var(--line);border-radius:7px;padding:8px 10px}
+input[type=number]{font-family:var(--font-num)}
+textarea{font-family:var(--font-num);font-size:.76rem;line-height:1.45;resize:vertical}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* 버튼 */
+button{font-family:inherit;font-size:.92rem;font-weight:500;cursor:pointer;
+  border-radius:7px;border:1px solid var(--line-hard);background:var(--panel);color:var(--ink);padding:9px 16px}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+button.primary:hover{filter:brightness(1.08)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.row.end{justify-content:flex-end}
+
+/* 진행 레일 */
+.rail{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
+.rail span{font-family:var(--font-num);font-size:.68rem;letter-spacing:.06em;
+  padding:3px 8px;border-radius:4px;background:var(--sunk);color:var(--faint)}
+.rail span.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.rail span.done{color:var(--muted)}
+
+/* ── 자극 표시면: 조건 간 밝기 표준화를 위해 테마와 무관하게 고정 ── */
+.stage{background:#ffffff;color:#111111;border:1px solid #c9d2d0;border-radius:10px;
+  padding:16px;user-select:none}
+.stage .banner{height:54px;display:flex;align-items:center;justify-content:center;
+  border-bottom:1px solid #e2e7e6;margin:-16px -16px 14px;background:#fafbfb}
+.stage .banner svg{width:40px;height:40px;display:none}
+.stage .banner.show svg{display:block}
+.sheet{width:100%;border-collapse:collapse;font-family:var(--font-num);font-size:1.02rem;
+  font-variant-numeric:tabular-nums}
+.sheet th{font-size:.68rem;letter-spacing:.09em;text-transform:uppercase;color:#6b7572;
+  font-weight:500;padding:5px 10px;border-bottom:1px solid #d6dedc;text-align:left}
+.sheet td{padding:7px 10px;border-bottom:1px solid #eef1f0;letter-spacing:.06em;cursor:pointer}
+.sheet tr:hover td{background:#f2f5f4}
+.sheet td.idx{color:#9aa5a2;font-size:.78rem;width:34px;cursor:default}
+.stage.nopick .sheet td{cursor:default}
+.stage.nopick .sheet tr:hover td{background:transparent}
+.fix{text-align:center;font-size:1.5rem;color:#111;padding:6px 0 2px;font-family:var(--font-num)}
+
+/* 계기 */
+.meters{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.meter{min-width:0}
+.meter b{display:block;font-family:var(--font-num);font-size:1.3rem;font-weight:500;
+  font-variant-numeric:tabular-nums;line-height:1.2}
+.meter span{font-size:.72rem;color:var(--muted);letter-spacing:.04em}
+.bar{height:5px;border-radius:3px;background:var(--sunk);overflow:hidden;margin-top:12px}
+.bar i{display:block;height:100%;background:var(--accent);width:0}
+
+/* 학습 */
+.learnbox{display:flex;align-items:center;justify-content:center;height:190px;
+  background:#fff;border:1px solid #c9d2d0;border-radius:10px}
+.learnbox svg{width:84px;height:84px}
+.learnbox .snd{font-family:var(--font-num);font-size:1.05rem;color:#4a5553;letter-spacing:.1em}
+.verdict{text-align:center;font-weight:600;min-height:1.6em;margin-top:10px}
+.verdict.ok{color:var(--good)} .verdict.no{color:var(--bad)}
+.keys{display:flex;gap:10px;justify-content:center;margin-top:12px;flex-wrap:wrap}
+.key{font-family:var(--font-num);font-size:.8rem;border:1px solid var(--line-hard);
+  border-radius:6px;padding:6px 12px;color:var(--muted)}
+
+/* RTLX */
+.tlx{display:grid;gap:14px}
+.tlx .item{display:grid;gap:5px}
+.tlx .hdr{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.tlx .hdr b{font-weight:600;font-size:.94rem}
+.tlx .hdr em{font-style:normal;font-family:var(--font-num);font-variant-numeric:tabular-nums;
+  color:var(--accent);font-weight:600}
+.tlx .anchor{display:flex;justify-content:space-between;gap:12px;font-size:.72rem;color:var(--faint)}
+.tlx .def{margin:0;font-size:.82rem;line-height:1.55;color:var(--muted);max-width:62ch}
+.tlx .item{padding-bottom:14px;border-bottom:1px solid var(--line)}
+.tlx .item:last-child{border-bottom:0;padding-bottom:0}
+.tlx .item.rev{background:var(--sunk);border-radius:8px;padding:12px;border-bottom:0}
+.tlx .item.rev .anchor span:first-child{color:var(--good);font-weight:600}
+input[type=range]{padding:0;background:transparent;border:0;accent-color:var(--accent)}
+
+/* 표 */
+.tbl{width:100%;border-collapse:collapse;font-size:.82rem}
+.tbl th,.tbl td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--line)}
+.tbl th{font-size:.7rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.tbl td.n{font-family:var(--font-num);font-variant-numeric:tabular-nums}
+.scroll{overflow-x:auto}
+
+.chip{display:inline-block;font-size:.7rem;font-weight:600;letter-spacing:.04em;
+  padding:2px 9px;border-radius:999px;white-space:nowrap}
+.chip.ok{background:var(--accent-soft);color:var(--good)}
+.chip.no{background:rgba(154,43,43,.14);color:var(--bad)}
+.chip.na{background:var(--sunk);color:var(--faint)}
+.note{font-size:.82rem;color:var(--muted);background:var(--sunk);border-left:3px solid var(--line-hard);
+  border-radius:0 6px 6px 0;padding:10px 12px;margin:10px 0}
+.note.warn{border-left-color:var(--warn)}
+ul.tight{margin:0 0 10px;padding-left:18px}
+ul.tight li{margin-bottom:4px}
+.big{font-family:var(--font-num);font-size:2.6rem;font-weight:500;text-align:center;
+  font-variant-numeric:tabular-nums;margin:8px 0}
+.center{text-align:center}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.tabs button{font-size:.8rem;padding:6px 12px}
+.tabs button[aria-pressed=true]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="top">
+    <h1>알림 양식 이중과업 과업 페이지</h1>
+    <span class="badge" id="railTag">설정</span>
+  </div>
+
+  <div class="rail" id="rail" hidden></div>
+
+  <!-- ══════════ 1. 설정 ══════════ -->
+  <section id="s-setup">
+    <div class="card">
+      <h2>참가자 정보</h2>
+      <div class="grid two">
+        <div><label for="pid">참가자 ID</label><input id="pid" value="P01"></div>
+        <div><label for="seq">Williams 시퀀스 (1–10)</label>
+          <select id="seq"></select></div>
+        <div><label for="hand">주 사용 손</label>
+          <select id="hand"><option>오른손</option><option>왼손</option></select></div>
+        <div><label for="sex">성별</label>
+          <select id="sex"><option>여</option><option>남</option><option>응답 안 함</option></select></div>
+        <div><label for="age">연령</label><input id="age" type="number" value="21" min="18" max="40"></div>
+        <div><label for="major">전공</label>
+          <select id="major"><option>공학</option><option>비공학</option></select></div>
+        <div><label for="sleep">전일 수면 시간 (h)</label><input id="sleep" type="number" value="7" step="0.5" min="0" max="14"></div>
+        <div><label for="caf">2시간 내 카페인 섭취</label>
+          <select id="caf"><option>없음</option><option>있음</option></select></div>
+        <div><label for="vis">교정 후 자극 식별 가능 여부</label>
+          <select id="vis"><option>가능</option><option>불가</option></select></div>
+        <div><label for="cv">색각 이상</label>
+          <select id="cv"><option>없음</option><option>있음</option></select></div>
+        <div><label for="hear">청력 이상</label>
+          <select id="hear"><option>없음</option><option>있음</option></select></div>
+        <div><label for="expr">실험자</label><input id="expr" value=""></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>파일럿 조정값</h2>
+      <p class="lede"><small>부록 B에 따라 자릿수와 행 수를 조정해 90초당 처리량이 6–10개에 들어오도록 맞춥니다.</small></p>
+      <div class="grid three">
+        <div><label for="cfgDigits">숫자 자릿수</label><input id="cfgDigits" type="number" value="6" min="3" max="10"></div>
+        <div><label for="cfgRows">표의 행 수</label><input id="cfgRows" type="number" value="10" min="4" max="20"></div>
+        <div><label for="cfgBlock">블록 길이 (초)</label><input id="cfgBlock" type="number" value="90" min="10" max="300"></div>
+        <div><label for="cfgAlerts">블록당 알림 수</label><input id="cfgAlerts" type="number" value="12" min="2" max="30"></div>
+        <div><label for="cfgGapMin">최소 간격 (초)</label><input id="cfgGapMin" type="number" value="5" step="0.5" min="1"></div>
+        <div><label for="cfgGapMax">최대 간격 (초)</label><input id="cfgGapMax" type="number" value="9" step="0.5" min="2"></div>
+        <div><label for="cfgResp">응답 제한시간 (초)</label><input id="cfgResp" type="number" value="3" step="0.5" min="1"></div>
+        <div><label for="cfgRestB">블록 간 휴식 (초)</label><input id="cfgRestB" type="number" value="20" min="0"></div>
+        <div><label for="cfgRestC">조건 간 휴식 (초)</label><input id="cfgRestC" type="number" value="60" min="0"></div>
+        <div><label for="cfgPractice">연습 블록 수</label><input id="cfgPractice" type="number" value="2" min="0" max="4"></div>
+        <div><label for="cfgLearnN">학습 문항/블록</label><input id="cfgLearnN" type="number" value="24" min="4" max="60"></div>
+        <div><label for="cfgLearnCrit">학습 통과 기준 (%)</label><input id="cfgLearnCrit" type="number" value="90" min="50" max="100"></div>
+      </div>
+      <div style="margin-top:12px">
+        <label for="cfgTone">알림음 설계</label>
+        <select id="cfgTone">
+          <option value="dir">방향형 — 상승·하강 (보고서 표 A2)</option>
+          <option value="pitch">음고형 — 낮음·높음 (제시 즉시 판별)</option>
+        </select>
+      </div>
+      <div class="note warn" id="toneNote"></div>
+      <div class="note" id="mixNote"></div>
+      <div class="note">알림 시간표는 사전에 한 번 생성해 <b>모든 조건에 동일하게</b> 적용합니다. 첫 알림은 시작 후 최소 간격 이후, 마지막 알림은 블록 종료 최소 <span id="echoResp">3</span>초 전에 제시됩니다.</div>
+    </div>
+
+    <div class="card flat">
+      <h3>점검용</h3>
+      <div class="row">
+        <button id="btnQuick">짧게 설정 (페이지 작동 확인용)</button>
+        <button id="btnSound">알림음 4종 들어보기</button>
+        <button id="btnCloud">결과 모아 보기</button>
+        <button id="btnRestore">이 기기 기록</button>
+      </div>
+      <p style="margin:10px 0 0"><small class="lede" id="cloudStatus"></small></p>
+      <div style="margin-top:12px">
+        <label for="cfgEndpoint">수집 주소 (선택 사항 — 비워 두어도 됩니다)</label>
+        <input id="cfgEndpoint" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
+      </div>
+      <p style="margin:10px 0 0"><small class="lede">짧게 설정은 블록 20초·알림 4회로 바꿉니다. 실제 측정에는 쓰지 마세요.</small></p>
+    </div>
+
+    <div class="card flat">
+      <h3>파일럿 3단계만 실행</h3>
+      <p class="lede" style="margin-bottom:10px"><small>양식 균형 점검에 필요한 부분만 돌립니다 — 연습, 알림 학습(두 양식), <b>B 시각 단독 2블록</b>, <b>C 청각 단독 2블록</b>, 각 조건 뒤 RTLX. 주 과업이 들어가는 A·D·E는 건너뜁니다. 약 15분.</small></p>
+      <div class="row"><button id="btnBalance">B·C 균형 점검만 실행</button></div>
+    </div>
+
+    <div class="row end">
+      <button class="primary" id="btnToInstr">전체 실험 — 지시문으로</button>
+    </div>
+  </section>
+
+  <!-- ══════════ 2. 지시문 ══════════ -->
+  <section id="s-instr" hidden>
+    <div class="card">
+      <h2>실험 안내</h2>
+      <p><b>주 과업 — 대조 검증.</b> 원본과 입력본 두 열이 나란히 제시됩니다. 열 개 행 중 <b>한 행만</b> 좌우 값이 다릅니다. 그 행을 마우스로 클릭하세요. 맞히면 즉시 다음 표가 나옵니다. 틀린 행을 눌러도 표는 그대로 유지되며 따로 표시가 나타나지 않습니다.</p>
+      <p><b>보조 과업 — 알림 분류.</b> 알림이 오면 <b>업무 알림은 ←</b>, <b>광고 알림은 →</b> 방향키를 누르세요. 알림은 화면 위쪽 배너의 아이콘 또는 이어폰의 알림음으로 0.5초간 제시됩니다. 응답 시간은 <span class="respEcho">3</span>초입니다.</p>
+      <div class="note warn"><b>우선순위.</b> 대조 검증을 최우선으로 수행하되, 알림은 <b>하나도 놓치지 말고</b> 가능한 한 빠르고 정확하게 분류하세요.</div>
+      <p><b>손 배치.</b> 주 과업은 마우스를 쥔 우세손으로, 알림 분류는 <b>비우세손의 방향키</b>로 수행합니다. 실험 내내 이 배치를 유지하세요.</p>
+      <p><b>알림만 제시되는 블록</b>에서는 숫자 대신 중립 기호가 채워진 격자가 나옵니다. 이때는 클릭하지 말고 <b>화면 중앙을 응시</b>한 채 알림에만 반응하세요.</p>
+      <div class="keys"><span class="key">← 업무 알림</span><span class="key">→ 광고 알림</span></div>
+      <div class="note warn" id="modeNote" hidden></div>
+    </div>
+    <div class="row end">
+      <button id="btnBackSetup">설정으로</button>
+      <button class="primary" id="btnToPractice">주 과업 연습 시작</button>
+    </div>
+  </section>
+
+  <!-- ══════════ 3. 공용 스테이지 ══════════ -->
+  <section id="s-run" hidden>
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:12px">
+        <h2 id="runTitle" style="margin:0">블록</h2>
+        <span class="badge" id="runTag">—</span>
+      </div>
+      <div class="stage" id="stage">
+        <div class="banner" id="banner"></div>
+        <div id="sheetHost"></div>
+        <div class="fix" id="fix" hidden>＋</div>
+      </div>
+      <div class="bar"><i id="barFill"></i></div>
+      <div class="meters">
+        <div class="meter"><b id="mTime">90.0</b><span>남은 시간 (초)</span></div>
+        <div class="meter"><b id="mDone">0</b><span>완료한 표</span></div>
+        <div class="meter"><b id="mMiss">0</b><span>오클릭</span></div>
+        <div class="meter"><b id="mAlert">0</b><span>제시된 알림</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ 4. 알림 학습 ══════════ -->
+  <section id="s-learn" hidden>
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:12px">
+        <h2 id="learnTitle" style="margin:0">알림 학습</h2>
+        <span class="badge" id="learnTag">—</span>
+      </div>
+      <div class="learnbox" id="learnBox"></div>
+      <div class="verdict" id="learnVerdict">&nbsp;</div>
+      <div class="keys"><span class="key">← 업무</span><span class="key">→ 광고</span></div>
+      <div class="bar"><i id="learnBar"></i></div>
+    </div>
+  </section>
+
+  <!-- ══════════ 5. 휴식 ══════════ -->
+  <section id="s-rest" hidden>
+    <div class="card center">
+      <h2 id="restTitle">휴식</h2>
+      <div class="big" id="restCount">60</div>
+      <p class="lede" id="restNote">잠시 쉬세요. 남은 시간이 끝나면 자동으로 다음 단계가 시작됩니다.</p>
+      <button id="btnSkipRest">지금 바로 시작</button>
+    </div>
+  </section>
+
+  <!-- ══════════ 6. RTLX ══════════ -->
+  <section id="s-tlx" hidden>
+    <div class="card">
+      <h2 id="tlxTitle">조건 A — NASA-TLX (RTLX)</h2>
+      <p class="lede"><small>방금 수행한 두 블록 전체를 떠올리며 응답하세요. 각 항목의 설명을 먼저 읽고 0–100점으로 표시합니다. 여섯 항목은 서로 다른 것을 묻습니다.</small></p>
+      <div class="tlx" id="tlxForm"></div>
+    </div>
+    <div class="row end"><button class="primary" id="btnTlxDone">제출</button></div>
+  </section>
+
+  <!-- ══════════ 7. 종료 ══════════ -->
+  <section id="s-done" hidden>
+    <div class="card">
+      <h2>기록 완료</h2>
+      <div class="note" id="saveState">저장 중…</div>
+      <p class="lede">아래 표를 복사해 .csv 파일로 저장할 수도 있습니다.</p>
+      <div class="note warn">사후 인터뷰를 진행하세요 — 두 과업 사이에 어떤 전략으로 주의를 배분했는지, 어느 조건이 가장 부담스러웠는지 묻고 기록합니다.</div>
+      <div class="tabs" id="csvTabs"></div>
+      <textarea id="csvOut" rows="13" readonly></textarea>
+      <div class="row" style="margin-top:10px">
+        <button class="primary" id="btnSaveJson">결과 파일 다시 저장</button>
+        <button id="btnSaveCsvs">CSV 여섯 개로 저장</button>
+        <button id="btnCopy">표시된 표 복사</button>
+        <span id="copyMsg" class="lede"><small></small></span>
+      </div>
+    </div>
+    <div class="card" id="verdictCard" hidden>
+      <h2>양식 균형 점검 결과</h2>
+      <p class="lede"><small>보고서 부록 A·B가 정한 점검 항목에 대한 판정입니다. <b>참가자 한 명의 결과</b>이므로, 여섯 명분을 모은 뒤에 조정 여부를 결정하세요.</small></p>
+      <div class="scroll"><table class="tbl" id="verdictTbl"></table></div>
+    </div>
+
+    <div class="card">
+      <h3>조건별 요약</h3>
+      <div class="scroll"><table class="tbl" id="sumTbl"></table></div>
+    </div>
+    <div class="row end"><button id="btnNewRun">새 참가자 시작</button></div>
+  </section>
+
+  <!-- ══════════ 모은 결과 (공유 저장소) ══════════ -->
+  <section id="s-cloud" hidden>
+    <div class="card">
+      <h2>모은 결과</h2>
+      <p class="lede">조원들이 보내온 결과 파일(.json)을 한꺼번에 선택하면 아래에서 하나로 합쳐집니다. 파일은 이 브라우저 밖으로 나가지 않습니다.</p>
+      <div class="row" style="margin-bottom:12px">
+        <input type="file" id="fileLoad" accept=".json,application/json" multiple>
+        <span id="loadMsg" class="lede"><small></small></span>
+      </div>
+      <div class="scroll"><table class="tbl" id="cloudTbl"></table></div>
+    </div>
+    <div class="card">
+      <h3>전체 합치기</h3>
+      <p class="lede"><small>모든 참가자의 같은 표를 하나로 이어 붙입니다. 분석에는 이걸 쓰세요.</small></p>
+      <div class="tabs" id="mergeTabs"></div>
+      <textarea id="mergeOut" rows="11" readonly></textarea>
+      <div class="row" style="margin-top:10px">
+        <button class="primary" id="btnMergeSave">CSV로 저장</button>
+        <button id="btnMergeCopy">복사</button>
+        <span id="mergeMsg" class="lede"><small></small></span>
+      </div>
+    </div>
+    <div class="row end"><button id="btnCloudBack">돌아가기</button></div>
+  </section>
+
+  <!-- ══════════ 이전 기록 ══════════ -->
+  <section id="s-hist" hidden>
+    <div class="card">
+      <h2>이 브라우저에 보관된 기록</h2>
+      <div class="scroll"><table class="tbl" id="histTbl"></table></div>
+    </div>
+    <div class="row end"><button id="btnHistBack">돌아가기</button></div>
+  </section>
+</div>
+
+<script>
+"use strict";
+
+/* ════════════ 자극 정의 (부록 A 표 A2) ════════════ */
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const ICON = {
+  W1:'<path d="M28 68 h200 a10 10 0 0 1 10 10 v100 a10 10 0 0 1 -10 10 h-200 a10 10 0 0 1 -10 -10 v-100 a10 10 0 0 1 10 -10 z"/><path d="M22 76 L128 150 L234 76"/>',
+  W2:'<rect x="34" y="58" width="188" height="166" rx="12"/><path d="M34 106 H222"/><path d="M84 36 V74"/><path d="M172 36 V74"/><path d="M78 146 h18"/><path d="M119 146 h18"/><path d="M160 146 h18"/><path d="M78 186 h18"/><path d="M119 186 h18"/>',
+  P1:'<path d="M140 26 H224 a6 6 0 0 1 6 6 V116 L118 228 L28 138 Z"/><circle cx="192" cy="64" r="15"/>',
+  P2:'<path d="M50 84 H206 L192 222 H64 Z"/><path d="M100 84 V60 a28 28 0 0 1 56 0 V84"/>'
+};
+const STIM = {
+  W1:{cat:'업무', key:'ArrowLeft',  label:'메일 아이콘'},
+  W2:{cat:'업무', key:'ArrowLeft',  label:'캘린더 아이콘'},
+  P1:{cat:'광고', key:'ArrowRight', label:'할인 태그 아이콘'},
+  P2:{cat:'광고', key:'ArrowRight', label:'쇼핑백 아이콘'}
+};
+const IDS = ['W1','W2','P1','P2'];
+const STIM_MS = 500;
+
+/* 알림음 설계.
+   방향형: 범주가 음의 진행 방향으로 결정된다. 같은 범주끼리 첫 음을 공유하지 않도록
+     업무와 광고가 같은 시작음 집합 {523, 659}를 쓴다. 첫 음만 듣고 범주를 맞히는
+     지름길이 생기면 '방향을 듣는다'는 설계가 무너지기 때문이다.
+     또한 2음과 3음 모두 둘째 음이 167 ms에 시작하도록 길이를 맞추어,
+     네 자극의 범주 판별 가능 시점을 같게 한다.
+   음고형: 범주가 음높이로 결정되어 제시와 동시에 판별할 수 있다. 아이콘과 시간 조건을
+     맞추기 위한 대안이며, 부록 A의 '자극 교체' 절차에 해당한다. */
+const TONESETS = {
+  dir:{ label:'방향형 — 상승·하강 (보고서 표 A2)',
+    W1:{seq:[523,784],     name:'상승 2음'},
+    W2:{seq:[659,784,988], name:'상승 3음'},
+    P1:{seq:[523,349],     name:'하강 2음'},
+    P2:{seq:[659,554,440], name:'하강 3음'} },
+  pitch:{ label:'음고형 — 낮음·높음 (제시 즉시 판별)',
+    W1:{seq:[392], name:'낮은 단음 G4'},
+    W2:{seq:[494], name:'낮은 단음 B4'},
+    P1:{seq:[784], name:'높은 단음 G5'},
+    P2:{seq:[988], name:'높은 단음 B5'} }
+};
+const TONE_DURS = {1:[500], 2:[167,333], 3:[167,167,166]};
+let TONESET = 'dir';
+
+/* Williams 설계 10개 시퀀스 (부록 A 표 A1) */
+const WILLIAMS = [
+  ['A','B','E','C','D'], ['B','C','A','D','E'], ['C','D','B','E','A'],
+  ['D','E','C','A','B'], ['E','A','D','B','C'], ['D','C','E','B','A'],
+  ['E','D','A','C','B'], ['A','E','B','D','C'], ['B','A','C','E','D'],
+  ['C','B','D','A','E']
+];
+const COND = {
+  A:{name:'대조 단독',      primary:true,  alert:null},
+  B:{name:'시각 알림 단독', primary:false, alert:'visual'},
+  C:{name:'청각 알림 단독', primary:false, alert:'audio'},
+  D:{name:'대조 + 시각',    primary:true,  alert:'visual'},
+  E:{name:'대조 + 청각',    primary:true,  alert:'audio'}
+};
+/* NASA-TLX는 각 항목의 정의를 함께 제시하고 응답받는 척도이므로(Hart & Staveland, 1988)
+   원 척도의 설명을 항목마다 붙인다. '수행 수준'만 척도 방향이 반대다. */
+const TLX_ITEMS = [
+  {k:'mental',  n:'정신적 요구', lo:'매우 낮음', hi:'매우 높음',
+   d:'생각하고 판단하고 살피는 일이 얼마나 많이 필요했습니까? 숫자를 비교하고 알림을 가려내는 일이 단순했습니까, 복잡했습니까?'},
+  {k:'physical',n:'신체적 요구', lo:'매우 낮음', hi:'매우 높음',
+   d:'마우스를 움직이고 키를 누르고 화면을 훑는 신체 활동이 얼마나 많이 필요했습니까? 동작이 편했습니까, 힘들었습니까?'},
+  {k:'temporal',n:'시간적 요구', lo:'전혀 쫓기지 않음', hi:'매우 쫓김',
+   d:'과업이 진행되는 <b>속도와 간격</b> 때문에 시간에 쫓긴다는 느낌을 얼마나 받았습니까? 표가 넘어가는 속도와 알림이 오는 간격이 여유로웠습니까, 급박했습니까? 과업이 얼마나 어려웠는지가 아니라 <b>얼마나 몰아쳤는지</b>를 답해 주세요.'},
+  {k:'perf',    n:'수행 수준',   lo:'매우 잘함',       hi:'매우 못함',
+   d:'주어진 목표를 얼마나 잘 달성했다고 생각합니까? 스스로의 수행에 얼마나 만족합니까? <b>이 항목만 왼쪽이 좋은 쪽입니다.</b>'},
+  {k:'effort',  n:'노력',       lo:'매우 낮음', hi:'매우 높음',
+   d:'방금의 수행 수준에 도달하기 위해 정신적·신체적으로 얼마나 애써야 했습니까?'},
+  {k:'frust',   n:'좌절',       lo:'매우 낮음', hi:'매우 높음',
+   d:'과업을 하는 동안 짜증, 불안, 낙담을 얼마나 느꼈습니까? 반대로 편안하고 만족스러웠습니까?'}
+];
+
+/* ════════════ 난수 (자극 세트 재현용) ════════════ */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+const pick=(r,arr)=>arr[Math.floor(r()*arr.length)];
+function shuffle(r,arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+/* ════════════ 설정 / 상태 ════════════ */
+const $=id=>document.getElementById(id);
+let CFG={}, P={}, RUN=null;
+let MODE='full';          // 'full' = 전체 실험, 'balance' = 파일럿 3단계(B·C 균형 점검)
+let blocks=[], trials=[], tlx={}, practiceLog=[], learnLog=[];
+let schedule=[], order=[];
+
+function readCfg(){
+  CFG={
+    digits:+$('cfgDigits').value, rows:+$('cfgRows').value,
+    blockMs:+$('cfgBlock').value*1000, nAlerts:+$('cfgAlerts').value,
+    gapMin:+$('cfgGapMin').value, gapMax:+$('cfgGapMax').value,
+    respMs:+$('cfgResp').value*1000,
+    restBlock:+$('cfgRestB').value, restCond:+$('cfgRestC').value,
+    practice:+$('cfgPractice').value,
+    learnN:+$('cfgLearnN').value, learnCrit:+$('cfgLearnCrit').value/100, learnMax:3
+  };
+  if(CFG.gapMax<=CFG.gapMin) CFG.gapMax=CFG.gapMin+1;
+  TONESET=$('cfgTone').value;
+  CFG.toneset=TONESET;
+  const n=CFG.nAlerts, w=Math.floor(n/2), p=n-w, odd=(n%2!==0);
+  const mn=$('mixNote');
+  mn.className='note'+(odd?' warn':'');
+  mn.innerHTML='한 블록에는 <b>한 가지 양식만</b> 제시됩니다. 조건이 양식을 정하므로 시각과 청각이 한 블록 안에 섞이지 않습니다. '+
+    '블록당 알림 '+n+'회는 <b>업무 '+w+' : 광고 '+p+'</b>로 고정되고, 순서만 블록마다 새로 섞입니다.'+
+    (odd?' <b>알림 수가 홀수여서 1 대 1을 맞출 수 없습니다.</b> 짝수로 바꾸세요.':'');
+  $('toneNote').innerHTML = TONESET==='dir'
+    ? '방향형에서는 둘째 음이 나야 업무인지 광고인지 알 수 있으므로, 판별 가능 시점이 제시 후 <b>167 ms</b>입니다. 아이콘은 제시와 동시에 판별되므로 그만큼의 고정 지연이 청각 쪽에 더해집니다. 이 지연은 양식별 단독 조건을 기준선으로 쓰는 H3에서는 상쇄되지만, H2·H4에서는 남습니다.'
+    : '음고형에서는 첫 음의 높이로 범주가 결정되므로 아이콘과 마찬가지로 <b>제시와 동시에</b> 판별할 수 있습니다. 두 양식의 시간 조건을 맞추려는 대안이며, 부록 A의 자극 교체 절차에 해당합니다.';
+  document.querySelectorAll('.respEcho').forEach(e=>e.textContent=(CFG.respMs/1000));
+  $('echoResp').textContent=(CFG.respMs/1000);
+}
+function readP(){
+  P={pid:$('pid').value.trim()||'P00', seq:+$('seq').value, hand:$('hand').value,
+     sex:$('sex').value, age:$('age').value, major:$('major').value, sleep:$('sleep').value,
+     caffeine:$('caf').value, vision:$('vis').value, colorv:$('cv').value, hearing:$('hear').value,
+     experimenter:$('expr').value.trim(), started:new Date().toISOString()};
+}
+
+/* ════════════ 주 과업 자극 ════════════ */
+function makeTable(r){
+  const d=CFG.digits, n=CFG.rows;
+  const left=[], right=[];
+  for(let i=0;i<n;i++){
+    let s='';
+    for(let k=0;k<d;k++) s+=Math.floor(r()*10);
+    if(s[0]==='0') s='1'+s.slice(1);
+    left.push(s); right.push(s);
+  }
+  // 불일치 행은 1..n, 불일치 자릿수는 둘째~다섯째 자리에 배치
+  const row=Math.floor(r()*n);
+  const maxPos=Math.min(d-1,4);
+  const pos=1+Math.floor(r()*Math.max(1,maxPos));
+  const old=+left[row][pos];
+  let nd=Math.floor(r()*10); if(nd===old) nd=(old+1+Math.floor(r()*9))%10;
+  right[row]=right[row].slice(0,pos)+nd+right[row].slice(pos+1);
+  return {left,right,row};
+}
+
+/* ════════════ 알림 시간표 ════════════ */
+function makeSchedule(r){
+  const limit=CFG.blockMs/1000-CFG.respMs/1000;
+  for(let t=0;t<800;t++){
+    const s=[]; let cur=CFG.gapMin+r()*1.5;
+    for(let i=0;i<CFG.nAlerts;i++){
+      s.push(cur);
+      cur+=CFG.gapMin+r()*(CFG.gapMax-CFG.gapMin);
+    }
+    if(s[s.length-1]<=limit) return s.map(x=>Math.round(x*1000));
+  }
+  const span=limit-CFG.gapMin, step=span/Math.max(1,CFG.nAlerts-1);
+  return Array.from({length:CFG.nAlerts},(_,i)=>Math.round((CFG.gapMin+i*step)*1000));
+}
+/* 블록마다 업무와 광고를 1 대 1로 맞춘다. 범주별 개수를 먼저 정하고 그 안에서
+   두 자극에 나누므로, 알림 수가 4의 배수가 아니어도 범주 비율은 깨지지 않는다.
+   홀수면 1 대 1이 불가능하므로 설정 화면에서 경고한다. */
+function makeOrder(r){
+  const n=CFG.nAlerts, wN=Math.floor(n/2), pN=n-wN;
+  const spread=(ids,k)=>Array.from({length:k},(_,i)=>ids[i%ids.length]);
+  return shuffle(r, spread(['W1','W2'],wN).concat(spread(['P1','P2'],pN)));
+}
+
+/* ════════════ 소리 ════════════ */
+let AC=null;
+function audio(){ if(!AC) AC=new (window.AudioContext||window.webkitAudioContext)();
+  if(AC.state==='suspended') AC.resume(); return AC; }
+function toneOf(id){ return TONESETS[TONESET][id]; }
+function playTone(id){
+  const ac=audio(), f=toneOf(id).seq, durs=TONE_DURS[f.length];
+  let t=ac.currentTime+0.004;
+  f.forEach((hz,i)=>{
+    const d=durs[i]/1000, o=ac.createOscillator(), g=ac.createGain();
+    o.type='sine'; o.frequency.setValueAtTime(hz,t);
+    const s=t, e=s+d;
+    g.gain.setValueAtTime(0,s);
+    g.gain.linearRampToValueAtTime(0.22,s+0.012);
+    g.gain.setValueAtTime(0.22,e-0.02);
+    g.gain.linearRampToValueAtTime(0,e-0.003);
+    o.connect(g); g.connect(ac.destination); o.start(s); o.stop(e);
+    t=e;
+  });
+}
+function iconSvg(id,cls){
+  return '<svg viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="14" '+
+    'stroke-linecap="round" stroke-linejoin="round" class="'+(cls||'')+'">'+ICON[id]+'</svg>';
+}
+
+/* ════════════ 화면 전환 ════════════ */
+const SECTIONS=['s-setup','s-instr','s-run','s-learn','s-rest','s-tlx','s-done','s-hist','s-cloud'];
+function show(id){ SECTIONS.forEach(s=>$(s).hidden=(s!==id)); window.scrollTo(0,0); }
+function setRail(stage){
+  const main = (MODE==='balance') ? 'B·C 점검' : '본 시행';
+  const steps=['설정','지시문','연습','학습',main,'종료'];
+  const i=steps.indexOf(stage==='본 시행'?main:stage);
+  $('rail').hidden=false;
+  $('rail').innerHTML=steps.map((s,k)=>
+    '<span class="'+(k===i?'on':(k<i?'done':''))+'">'+s+'</span>').join('');
+  $('railTag').textContent=stage;
+}
+
+/* ════════════ 블록 실행 ════════════ */
+function startBlock(opts){
+  // opts: {cond, setIdx, blockNo, practice}
+  const cond=COND[opts.cond];
+  const rng=mulberry32(1000+opts.setIdx*77+(P.seq||1)*13);
+  // 시간표는 모든 조건에 동일하게 적용하고, 자극 구성(각 자극 3회)은 고정한 채 순서만 블록마다 새로 섞는다.
+  RUN={
+    ...opts, cond, condName:opts.cond,
+    t0:performance.now(), done:0, misclicks:0, tableT:performance.now(),
+    tableTimes:[], alertIdx:0, pending:null, rng,
+    order:makeOrder(mulberry32(31337+opts.setIdx*101+(P.seq||1))),
+    alerts:[], raf:0, tbl:null
+  };
+  show('s-run');
+  $('runTitle').textContent = opts.practice ? '주 과업 연습' : ('조건 '+opts.cond+' — '+cond.name);
+  $('runTag').textContent = opts.practice ? ('연습 '+opts.blockNo+'/'+CFG.practice)
+    : ('블록 '+opts.blockNo+'/'+((MAIN.order&&MAIN.order.length)?MAIN.order.length*2:10)+' · 자극 세트 S'+opts.setIdx);
+  $('stage').classList.toggle('nopick', !cond.primary);
+  $('fix').hidden = cond.primary;
+  $('banner').classList.remove('show'); $('banner').innerHTML='';
+  $('mDone').textContent='0'; $('mMiss').textContent='0'; $('mAlert').textContent='0';
+  nextTable();
+  tick();
+}
+function nextTable(){
+  if(!RUN.cond.primary){
+    const n=CFG.rows, neutral='○'.repeat(CFG.digits);
+    let h='<table class="sheet"><thead><tr><th></th><th>원본</th><th>입력본</th></tr></thead><tbody>';
+    for(let i=0;i<n;i++) h+='<tr><td class="idx">'+(i+1)+'</td><td>'+neutral+'</td><td>'+neutral+'</td></tr>';
+    $('sheetHost').innerHTML=h+'</tbody></table>';
+    return;
+  }
+  const t=makeTable(RUN.rng); RUN.tbl=t; RUN.tableT=performance.now();
+  let h='<table class="sheet"><thead><tr><th></th><th>원본</th><th>입력본</th></tr></thead><tbody>';
+  for(let i=0;i<t.left.length;i++)
+    h+='<tr data-i="'+i+'"><td class="idx">'+(i+1)+'</td><td>'+t.left[i]+'</td><td>'+t.right[i]+'</td></tr>';
+  $('sheetHost').innerHTML=h+'</tbody></table>';
+  $('sheetHost').querySelectorAll('tr[data-i]').forEach(tr=>{
+    tr.addEventListener('click',()=>onRowClick(+tr.dataset.i));
+  });
+}
+function onRowClick(i){
+  if(!RUN||!RUN.cond.primary) return;
+  if(i===RUN.tbl.row){
+    RUN.done++; RUN.tableTimes.push(performance.now()-RUN.tableT);
+    $('mDone').textContent=RUN.done; nextTable();
+  }else{
+    RUN.misclicks++; $('mMiss').textContent=RUN.misclicks; // 시각 피드백 없음
+  }
+}
+function tick(){
+  if(!RUN) return;
+  const el=performance.now()-RUN.t0, left=Math.max(0,CFG.blockMs-el);
+  $('mTime').textContent=(left/1000).toFixed(1);
+  $('barFill').style.width=(100*Math.min(1,el/CFG.blockMs))+'%';
+
+  if(RUN.cond.alert && RUN.alertIdx<schedule.length && el>=schedule[RUN.alertIdx]){
+    presentAlert(RUN.alertIdx, el); RUN.alertIdx++;
+  }
+  if(RUN.pending && el-RUN.pending.onset>CFG.respMs){
+    closeAlert(null,null);
+  }
+  if(left<=0){ endBlock(); return; }
+  RUN.raf=requestAnimationFrame(tick);
+}
+function presentAlert(i, el){
+  const id=RUN.order[i%RUN.order.length];
+  RUN.pending={id, onset:el, onsetAbs:performance.now(), idx:i};
+  $('mAlert').textContent=(i+1);
+  if(RUN.cond.alert==='visual'){
+    const b=$('banner'); b.innerHTML=iconSvg(id); b.classList.add('show');
+    setTimeout(()=>{b.classList.remove('show'); b.innerHTML='';},STIM_MS);
+  }else{ try{playTone(id);}catch(e){} }
+}
+function closeAlert(key,tAbs){
+  const p=RUN.pending; if(!p) return;
+  RUN.pending=null;
+  const want=STIM[p.id].key;
+  const rec={
+    pid:P.pid, block:RUN.practice?0:RUN.blockNo, cond:RUN.practice?'practice':RUN.condName,
+    set:RUN.setIdx, idx:p.idx+1, stim:p.id, cat:STIM[p.id].cat,
+    modality:RUN.cond.alert==='visual'?'시각':'청각',
+    onsetMs:Math.round(p.onset),
+    response:key||'', rtMs:key?Math.round(tAbs-p.onsetAbs):'',
+    outcome:!key?'무응답':(key===want?'정답':'오답')
+  };
+  RUN.alerts.push(rec);
+}
+function onKey(e){
+  if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight') return;
+  e.preventDefault();
+  const t=performance.now();
+  if(RUN&&RUN.pending) closeAlert(e.key,t);
+  else if(LEARN&&LEARN.waiting) learnAnswer(e.key,t);
+}
+window.addEventListener('keydown',onKey,{passive:false});
+
+function endBlock(){
+  cancelAnimationFrame(RUN.raf);
+  if(RUN.pending) closeAlert(null,null);
+  const times=RUN.tableTimes;
+  const rec={
+    pid:P.pid, block:RUN.practice?0:RUN.blockNo, cond:RUN.practice?'practice':RUN.condName,
+    set:RUN.setIdx,
+    throughput:RUN.done, misclicks:RUN.misclicks,
+    secPerTable: times.length? +(times.reduce((a,b)=>a+b,0)/times.length/1000).toFixed(2) : '',
+    presented:RUN.alerts.length,
+    correct:RUN.alerts.filter(a=>a.outcome==='정답').length,
+    wrong:RUN.alerts.filter(a=>a.outcome==='오답').length,
+    missed:RUN.alerts.filter(a=>a.outcome==='무응답').length,
+    meanRt: meanRt(RUN.alerts)
+  };
+  if(RUN.practice) practiceLog.push(rec); else { blocks.push(rec); trials.push(...RUN.alerts); }
+  const finished=RUN;
+  RUN=null;
+  advance(finished);
+}
+function meanRt(list){
+  const ok=list.filter(a=>a.outcome==='정답'&&a.rtMs!=='');
+  if(!ok.length) return '';
+  return +(ok.reduce((a,b)=>a+b.rtMs,0)/ok.length/1000).toFixed(3);
+}
+
+/* ════════════ 알림 학습 ════════════ */
+let LEARN=null;
+function startLearn(modality, blockNo){
+  const r=mulberry32(7000+(P.seq||1)*31+blockNo+(modality==='visual'?0:500));
+  const seq=[]; const per=Math.ceil(CFG.learnN/4);
+  IDS.forEach(id=>{for(let i=0;i<per;i++) seq.push(id);});
+  LEARN={modality, blockNo, items:shuffle(r,seq).slice(0,CFG.learnN), i:0, ok:0, waiting:false, t0:0};
+  show('s-learn'); setRail('학습');
+  $('learnTitle').textContent='알림 학습 — '+(modality==='visual'?'시각 (아이콘)':'청각 (알림음)');
+  nextLearnItem();
+}
+function nextLearnItem(){
+  if(LEARN.i>=LEARN.items.length){ finishLearnBlock(); return; }
+  const id=LEARN.items[LEARN.i];
+  $('learnTag').textContent='문항 '+(LEARN.i+1)+'/'+LEARN.items.length;
+  $('learnBar').style.width=(100*LEARN.i/LEARN.items.length)+'%';
+  $('learnVerdict').textContent=' '; $('learnVerdict').className='verdict';
+  const box=$('learnBox');
+  if(LEARN.modality==='visual'){
+    box.innerHTML=iconSvg(id); box.style.color='#111';
+    setTimeout(()=>{ if(LEARN&&LEARN.waiting) box.innerHTML='<span class="snd">응답하세요</span>'; },STIM_MS);
+  }else{
+    box.innerHTML='<span class="snd">♪ 듣고 응답하세요</span>';
+    try{playTone(id);}catch(e){}
+  }
+  LEARN.cur=id; LEARN.waiting=true; LEARN.t0=performance.now();
+}
+function learnAnswer(key,t){
+  if(!LEARN||!LEARN.waiting) return;
+  LEARN.waiting=false;
+  const want=STIM[LEARN.cur].key, good=(key===want);
+  if(good) LEARN.ok++;
+  learnLog.push({pid:P.pid, modality:LEARN.modality==='visual'?'시각':'청각',
+    learnBlock:LEARN.blockNo, item:LEARN.i+1, stim:LEARN.cur,
+    response:key, rtMs:Math.round(t-LEARN.t0), correct:good?1:0});
+  // 되먹임도 학습 중인 양식으로만 준다. 청각 학습에서 아이콘을 보여주면 시각 단서가 섞인다.
+  const vis=(LEARN.modality==='visual');
+  const nm=vis ? STIM[LEARN.cur].label.replace(' 아이콘','') : toneOf(LEARN.cur).name;
+  const v=$('learnVerdict');
+  v.textContent=good?'정답':('오답 — '+nm+'은 '+STIM[LEARN.cur].cat+' 알림입니다');
+  v.className='verdict '+(good?'ok':'no');
+  const box=$('learnBox');
+  box.style.color=good?'#1d6b3c':'#9a2b2b';
+  box.innerHTML = vis ? iconSvg(LEARN.cur) : '<span class="snd">'+nm+' → '+STIM[LEARN.cur].cat+'</span>';
+  LEARN.i++;
+  setTimeout(nextLearnItem,750);
+}
+function finishLearnBlock(){
+  const acc=LEARN.ok/LEARN.items.length;
+  const passed=acc>=CFG.learnCrit;
+  const mod=LEARN.modality, bn=LEARN.blockNo;
+  LEARN=null;
+  if(passed){ learnPassed(mod, acc, bn); }
+  else if(bn>=CFG.learnMax){
+    rest(3,'학습 기준 미달', '정확도 '+(acc*100).toFixed(1)+'%. 세 블록 안에 기준에 도달하지 못했습니다. 실험자는 이 참가자를 분석에서 제외하고 그 수를 기록하세요.',
+      ()=>learnPassed(mod, acc, bn));
+  } else {
+    rest(5,'학습 블록 '+bn+' 종료','정확도 '+(acc*100).toFixed(1)+'% — 기준 '+(CFG.learnCrit*100)+'% 미달. 같은 양식으로 한 블록 더 진행합니다.',
+      ()=>startLearn(mod,bn+1));
+  }
+}
+let learnState={order:[], done:0, acc:{}};
+function learnPassed(mod, acc, bn){
+  learnState.acc[mod]={acc:+(acc*100).toFixed(1), blocks:bn};
+  learnState.done++;
+  if(learnState.done<learnState.order.length){
+    const next=learnState.order[learnState.done];
+    rest(5,'학습 완료 — '+(mod==='visual'?'시각':'청각'),'정확도 '+(acc*100).toFixed(1)+'%. 이어서 '+(next==='visual'?'시각':'청각')+' 양식을 학습합니다.',
+      ()=>startLearn(next,1));
+  }else{
+    rest(5,'알림 학습 완료','두 양식 모두 학습을 마쳤습니다. 본 시행을 시작합니다.', beginMain);
+  }
+}
+
+/* ════════════ 휴식 ════════════ */
+let restTimer=null;
+function rest(sec,title,note,then){
+  show('s-rest');
+  $('restTitle').textContent=title; $('restNote').textContent=note;
+  let left=sec; $('restCount').textContent=left;
+  clearInterval(restTimer);
+  const go=()=>{clearInterval(restTimer); restTimer=null; then();};
+  restTimer=setInterval(()=>{
+    left--; $('restCount').textContent=Math.max(0,left);
+    if(left<=0) go();
+  },1000);
+  $('btnSkipRest').onclick=go;
+}
+
+/* ════════════ 본 시행 진행 ════════════ */
+let MAIN={condIdx:0, blockInCond:0, blockNo:0, order:[]};
+function beginMain(){
+  // 균형 점검 모드에서는 알림 단독 두 조건만 수행하고, 순서는 참가자 사이에서 교대한다.
+  const ord = (MODE==='balance')
+    ? (P.seq%2===1 ? ['B','C'] : ['C','B'])
+    : WILLIAMS[P.seq-1];
+  MAIN={condIdx:0, blockInCond:0, blockNo:0, order:ord};
+  setRail('본 시행');
+  runNextMainBlock();
+}
+function runNextMainBlock(){
+  MAIN.blockNo++; MAIN.blockInCond++;
+  const c=MAIN.order[MAIN.condIdx];
+  startBlock({cond:c, setIdx:MAIN.blockNo, blockNo:MAIN.blockNo, practice:false});
+}
+function advance(fin){
+  if(fin.practice){
+    if(fin.blockNo<CFG.practice){
+      rest(CFG.restBlock,'연습 블록 '+fin.blockNo+' 종료',
+        '완료한 표 '+fin.throughput+'개, 오클릭 '+fin.misclicks+'회. 다음 연습 블록을 시작합니다.',
+        ()=>startPractice(fin.blockNo+1));
+    }else{
+      const tot=practiceLog.reduce((a,b)=>a+b.throughput,0)/practiceLog.length;
+      rest(CFG.restBlock,'주 과업 연습 종료',
+        '블록당 평균 '+tot.toFixed(1)+'개 (목표 6–10개). 이어서 알림 분류를 학습합니다.',
+        ()=>{ learnState={order:(P.seq%2===1?['visual','audio']:['audio','visual']), done:0, acc:{}};
+              startLearn(learnState.order[0],1); });
+    }
+    return;
+  }
+  if(MAIN.blockInCond<2){
+    rest(CFG.restBlock,'블록 간 휴식','조건 '+MAIN.order[MAIN.condIdx]+'의 두 번째 블록을 이어서 수행합니다.',
+      runNextMainBlock);
+  }else{
+    askTlx(MAIN.order[MAIN.condIdx]);
+  }
+}
+function askTlx(cond){
+  show('s-tlx'); setRail('본 시행');
+  $('tlxTitle').textContent='조건 '+cond+' ('+COND[cond].name+') — NASA-TLX (RTLX)';
+  $('tlxForm').innerHTML=TLX_ITEMS.map(it=>
+    '<div class="item'+(it.k==='perf'?' rev':'')+'">'+
+    '<div class="hdr"><b>'+it.n+'</b><em id="v_'+it.k+'">50</em></div>'+
+    '<p class="def">'+it.d+'</p>'+
+    '<input type="range" id="r_'+it.k+'" min="0" max="100" value="50" step="1" '+
+      'aria-label="'+it.n+'">'+
+    '<div class="anchor"><span>0 · '+it.lo+'</span><span>'+it.hi+' · 100</span></div></div>').join('');
+  TLX_ITEMS.forEach(it=>{
+    const r=$('r_'+it.k); r.addEventListener('input',()=>{$('v_'+it.k).textContent=r.value;});
+  });
+  $('btnTlxDone').onclick=()=>{
+    const vals={}; let sum=0;
+    TLX_ITEMS.forEach(it=>{const v=+$('r_'+it.k).value; vals[it.k]=v; sum+=v;});
+    vals.mean=+(sum/6).toFixed(2);
+    tlx[cond]=vals;
+    MAIN.condIdx++; MAIN.blockInCond=0;
+    if(MAIN.condIdx>=MAIN.order.length){ finish(); }
+    else rest(CFG.restCond,'조건 간 휴식',
+      '다음 조건은 '+MAIN.order[MAIN.condIdx]+' ('+COND[MAIN.order[MAIN.condIdx]].name+')입니다.',
+      runNextMainBlock);
+  };
+}
+function startRun(){
+  readCfg(); readP();
+  audio();
+  const r=mulberry32(4242+(P.seq||1));
+  schedule=makeSchedule(r); order=makeOrder(r);
+  blocks=[]; trials=[]; tlx={}; practiceLog=[]; learnLog=[];
+  if(CFG.practice>0) startPractice(1);
+  else { learnState={order:(P.seq%2===1?['visual','audio']:['audio','visual']), done:0, acc:{}};
+         startLearn(learnState.order[0],1); }
+}
+function startPractice(n){
+  setRail('연습');
+  startBlock({cond:'A', setIdx:900+n, blockNo:n, practice:true});
+}
+
+/* ════════════ 결과 ════════════ */
+function condAgg(c){
+  const bs=blocks.filter(b=>b.cond===c);
+  if(!bs.length) return null;
+  const tp=bs.filter(b=>b.throughput!==''), thr=tp.length? tp.reduce((a,b)=>a+b.throughput,0)/tp.length : '';
+  const tr=trials.filter(t=>t.cond===c);
+  const pres=tr.length, ok=tr.filter(t=>t.outcome==='정답').length,
+        wr=tr.filter(t=>t.outcome==='오답').length, ms=tr.filter(t=>t.outcome==='무응답').length;
+  return {cond:c, throughput: COND[c].primary? +thr.toFixed(2):'',
+    misclicks: COND[c].primary? bs.reduce((a,b)=>a+b.misclicks,0):'',
+    presented:pres, acc: pres? +(100*ok/pres).toFixed(1):'',
+    wrongRate: pres? +(100*wr/pres).toFixed(1):'', missRate: pres? +(100*ms/pres).toFixed(1):'',
+    rt: meanRt(tr), rtlx: tlx[c]? tlx[c].mean : ''};
+}
+function finish(){
+  show('s-done'); setRail('종료');
+  const agg={}; ['A','B','C','D','E'].forEach(c=>agg[c]=condAgg(c));
+  // 표 D4 파생값
+  const num=v=>(typeof v==='number'&&isFinite(v))?v:null;
+  const dB=num(agg.D&&agg.D.rt), bB=num(agg.B&&agg.B.rt),
+        eE=num(agg.E&&agg.E.rt), cC=num(agg.C&&agg.C.rt);
+  const derived={
+    pid:P.pid, seq:P.seq,
+    thrD: agg.D? agg.D.throughput:'', thrE: agg.E? agg.E.throughput:'',
+    costDB: (dB!==null&&bB!==null)? +(dB-bB).toFixed(3):'',
+    costEC: (eE!==null&&cC!==null)? +(eE-cC).toFixed(3):'',
+    rtlxD: tlx.D? tlx.D.mean:'', rtlxE: tlx.E? tlx.E.mean:''
+  };
+  buildCsv(agg, derived);
+  renderSummary(agg, derived);
+  $('verdictCard').hidden = (MODE!=='balance');
+  if(MODE==='balance') renderVerdict(agg);
+  saveLocal(agg, derived);
+  saveCloud(agg, derived);
+}
+
+/* ── 파일럿 3단계 판정 ── */
+function stimAccRange(cond){
+  const t=trials.filter(x=>x.cond===cond);
+  if(!t.length) return null;
+  const v=IDS.map(id=>{
+    const s=t.filter(x=>x.stim===id);
+    return s.length? 100*s.filter(x=>x.outcome==='정답').length/s.length : null;
+  }).filter(x=>x!==null);
+  return v.length>1 ? +(Math.max(...v)-Math.min(...v)).toFixed(1) : null;
+}
+function renderVerdict(agg){
+  const num=v=>(typeof v==='number'&&isFinite(v))?v:null;
+  const B=agg.B||{}, C=agg.C||{};
+  const aB=num(B.acc), aC=num(C.acc), mB=num(B.missRate), mC=num(C.missRate),
+        rB=num(B.rt), rC=num(C.rt), sB=stimAccRange('B'), sC=stimAccRange('C');
+  const both=(x,y)=>(x!==null&&y!==null);
+  const rows=[];
+  rows.push(['분류 정확도',
+    both(aB,aC)? '시각 '+aB+'% · 청각 '+aC+'%':'—',
+    '두 양식 모두 90% 이상', both(aB,aC)? (aB>=90&&aC>=90):null]);
+  rows.push(['양식 간 정확도 차이',
+    both(aB,aC)? Math.abs(aB-aC).toFixed(1)+'%p':'—',
+    '10%p 이내', both(aB,aC)? Math.abs(aB-aC)<=10:null]);
+  const mx=both(mB,mC)? Math.max(mB,mC):null;
+  rows.push(['무응답률 (높은 쪽)', mx!==null? mx+'%':'—',
+    '5% 미만 — 응답 제한 '+(CFG.respMs/1000)+'초가 적절한가', mx!==null? mx<5:null]);
+  const sx=both(sB,sC)? Math.max(sB,sC):null;
+  rows.push(['자극별 정확도 범위', sx!==null? sx+'%p':'—',
+    '15%p 이내 — 네 자극 간 난이도 편차', sx!==null? sx<=15:null]);
+  let rtNote='참고값 — 판정하지 않음';
+  if(both(rB,rC)){
+    const d=rC-rB, s=(CFG.toneset==='dir')?0.167:0;
+    rtNote='청각 − 시각 = '+(d>=0?'+':'')+d.toFixed(3)+'초'
+      + (s? ' · 방향형의 구조적 지연 0.167초를 빼면 '+((d-s)>=0?'+':'')+(d-s).toFixed(3)+'초':'');
+  }
+  rows.push(['평균 반응시간', both(rB,rC)? '시각 '+rB+'s · 청각 '+rC+'s':'—', rtNote, null]);
+
+  const chip=ok=> ok===null ? '<span class="chip na">참고</span>'
+    : (ok? '<span class="chip ok">통과</span>' : '<span class="chip no">조정 필요</span>');
+  $('verdictTbl').innerHTML='<thead><tr><th>항목</th><th>결과</th><th>기준</th><th>판정</th></tr></thead><tbody>'
+    + rows.map(r=>'<tr><td>'+r[0]+'</td><td class="n">'+r[1]+'</td><td><small>'+r[2]+'</small></td><td>'+chip(r[3])+'</td></tr>').join('')
+    + '</tbody>';
+}
+function renderSummary(agg, d){
+  let h='<thead><tr><th>조건</th><th>처리량</th><th>오클릭</th><th>알림</th><th>정확도%</th><th>오답%</th><th>무응답%</th><th>반응시간(s)</th><th>RTLX</th></tr></thead><tbody>';
+  ['A','B','C','D','E'].forEach(c=>{const a=agg[c]; if(!a) return;
+    h+='<tr><td><b>'+c+'</b> '+COND[c].name+'</td>'+
+      ['throughput','misclicks','presented','acc','wrongRate','missRate','rt','rtlx']
+       .map(k=>'<td class="n">'+(a[k]===''?'—':a[k])+'</td>').join('')+'</tr>';});
+  h+='</tbody><tfoot><tr><td colspan="9" style="border:0;padding-top:10px">'+
+     '<small class="lede">분류 비용 D−B = '+(d.costDB===''?'—':d.costDB+' s')+
+     ' · E−C = '+(d.costEC===''?'—':d.costEC+' s')+'</small></td></tr></tfoot>';
+  $('sumTbl').innerHTML=h;
+}
+
+/* ════════════ CSV ════════════ */
+const CSV={};
+function q(v){ const s=String(v??''); return /[",\n]/.test(s)? '"'+s.replace(/"/g,'""')+'"' : s; }
+function toCsv(rows){ if(!rows.length) return '';
+  const k=Object.keys(rows[0]); return [k.join(',')].concat(rows.map(r=>k.map(x=>q(r[x])).join(','))).join('\n'); }
+function buildCsv(agg, derived){
+  CSV['표 D1 참가자 정보']=toCsv([{
+    참가자ID:P.pid, 시퀀스:P.seq, 주사용손:P.hand, 성별:P.sex, 연령:P.age, 전공:P.major,
+    전일수면h:P.sleep, 카페인2h:P.caffeine, 교정후식별:P.vision, 색각이상:P.colorv, 청력이상:P.hearing,
+    시각학습블록:(learnState.acc.visual||{}).blocks??'', 시각학습정확도:(learnState.acc.visual||{}).acc??'',
+    청각학습블록:(learnState.acc.audio||{}).blocks??'', 청각학습정확도:(learnState.acc.audio||{}).acc??'',
+    알림음설계:(TONESETS[CFG.toneset]||{}).label||CFG.toneset,
+    숫자자릿수:CFG.digits, 표행수:CFG.rows, 블록길이s:CFG.blockMs/1000,
+    블록당알림:CFG.nAlerts, 응답제한s:CFG.respMs/1000,
+    실험일시:P.started, 실험자:P.experimenter
+  }]);
+  CSV['표 D2 블록별 기록']=toCsv(blocks.map(b=>({
+    참가자ID:b.pid, 블록:b.block, 조건:b.cond, 자극세트:'S'+b.set,
+    처리량:b.throughput, 오클릭:b.misclicks, 표당소요s:b.secPerTable,
+    알림제시:b.presented, 분류정답:b.correct, 분류오답:b.wrong, 무응답:b.missed, 평균반응시간s:b.meanRt
+  })));
+  CSV['표 D3 조건별 RTLX']=toCsv(['A','B','C','D','E'].filter(c=>tlx[c]).map(c=>({
+    참가자ID:P.pid, 조건:c, 정신적요구:tlx[c].mental, 신체적요구:tlx[c].physical,
+    시간적요구:tlx[c].temporal, 수행:tlx[c].perf, 노력:tlx[c].effort, 좌절:tlx[c].frust, 평균:tlx[c].mean
+  })));
+  CSV['표 D4 파생값']=toCsv([{
+    참가자ID:derived.pid, 시퀀스:derived.seq,
+    '주과업D_표수':derived.thrD, '주과업E_표수':derived.thrE,
+    '분류비용D-B_s':derived.costDB, '분류비용E-C_s':derived.costEC,
+    'RTLX_D':derived.rtlxD, 'RTLX_E':derived.rtlxE
+  }]);
+  CSV['알림 시행 로그']=toCsv(trials.map(t=>({
+    참가자ID:t.pid, 블록:t.block, 조건:t.cond, 자극세트:'S'+t.set, 순번:t.idx,
+    자극:t.stim, 범주:t.cat, 양식:t.modality, 제시시점ms:t.onsetMs,
+    응답키:t.response, 반응시간ms:t.rtMs, 판정:t.outcome
+  })));
+  CSV['학습 로그']=toCsv(learnLog.map(l=>({
+    참가자ID:l.pid, 양식:l.modality, 학습블록:l.learnBlock, 문항:l.item,
+    자극:l.stim, 응답키:l.response, 반응시간ms:l.rtMs, 정답여부:l.correct
+  })));
+  const names=Object.keys(CSV);
+  $('csvTabs').innerHTML=names.map((n,i)=>
+    '<button type="button" data-n="'+i+'" aria-pressed="'+(i===0)+'">'+n+'</button>').join('');
+  $('csvTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    $('csvTabs').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed','false'));
+    b.setAttribute('aria-pressed','true');
+    $('csvOut').value=CSV[names[+b.dataset.n]];
+  });
+  $('csvOut').value=CSV[names[0]];
+}
+$('btnCopy').onclick=async()=>{
+  const ta=$('csvOut'); const msg=$('copyMsg').firstElementChild;
+  try{ await navigator.clipboard.writeText(ta.value); msg.textContent='복사했습니다. 메모장에 붙여넣고 .csv로 저장하세요.'; }
+  catch(e){ ta.focus(); ta.select(); msg.textContent='자동 복사가 막혔습니다. 선택해 두었으니 Ctrl+C 를 누르세요.'; }
+};
+
+/* ════════════ 로컬 보관 ════════════ */
+const LS='dualtask.sessions.v1';
+function loadLocal(){ try{ return JSON.parse(localStorage.getItem(LS)||'[]'); }catch(e){ return []; } }
+function saveLocal(agg, derived){
+  try{
+    const all=loadLocal();
+    all.push({pid:P.pid, seq:P.seq, at:P.started, csv:CSV});
+    localStorage.setItem(LS, JSON.stringify(all.slice(-40)));
+  }catch(e){}
+}
+$('btnRestore').onclick=()=>{
+  const all=loadLocal();
+  let h='<thead><tr><th>참가자</th><th>시퀀스</th><th>시각</th><th></th></tr></thead><tbody>';
+  if(!all.length) h+='<tr><td colspan="4" class="lede">보관된 기록이 없습니다.</td></tr>';
+  all.slice().reverse().forEach((s,i)=>{
+    h+='<tr><td><b>'+s.pid+'</b></td><td class="n">'+s.seq+'</td><td class="n">'+
+       new Date(s.at).toLocaleString('ko-KR')+'</td><td><button type="button" data-k="'+(all.length-1-i)+'">불러오기</button></td></tr>';
+  });
+  $('histTbl').innerHTML=h+'</tbody>';
+  $('histTbl').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    const s=loadLocal()[+b.dataset.k];
+    Object.keys(CSV).forEach(k=>delete CSV[k]);
+    Object.assign(CSV,s.csv);
+    const names=Object.keys(CSV);
+    $('csvTabs').innerHTML=names.map((n,i)=>'<button type="button" data-n="'+i+'" aria-pressed="'+(i===0)+'">'+n+'</button>').join('');
+    $('csvTabs').querySelectorAll('button').forEach(x=>x.onclick=()=>{
+      $('csvTabs').querySelectorAll('button').forEach(y=>y.setAttribute('aria-pressed','false'));
+      x.setAttribute('aria-pressed','true'); $('csvOut').value=CSV[names[+x.dataset.n]];
+    });
+    $('csvOut').value=CSV[names[0]];
+    $('sumTbl').innerHTML='<tbody><tr><td class="lede">불러온 기록입니다. 위의 표를 복사하세요.</td></tr></tbody>';
+    show('s-done');
+  });
+  show('s-hist');
+};
+$('btnHistBack').onclick=()=>show('s-setup');
+
+/* ════════════ 결과 내보내기 / 선택적 서버 전송 ════════════ */
+let RUNS=[], ENDPOINT='';
+/* 구글 Apps Script 웹앱 주소를 여기에 넣으면 모든 사람이 자동으로 쓰게 된다. */
+const DEFAULT_ENDPOINT='';
+const MERGE_KEYS=['표 D1 참가자 정보','표 D2 블록별 기록','표 D3 조건별 RTLX',
+                  '표 D4 파생값','알림 시행 로그','학습 로그'];
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const setCloudStatus=t=>{ const e=$('cloudStatus'); if(e) e.innerHTML=t; };
+
+const EP_KEY='dualtask.endpoint';
+function loadEndpoint(){
+  try{ ENDPOINT=localStorage.getItem(EP_KEY)||DEFAULT_ENDPOINT; }catch(e){ ENDPOINT=DEFAULT_ENDPOINT; }
+  const f=$('cfgEndpoint'); if(f) f.value=ENDPOINT;
+  paintCloud();
+}
+function saveEndpoint(v){
+  ENDPOINT=(v||'').trim();
+  try{ localStorage.setItem(EP_KEY,ENDPOINT); }catch(e){}
+  paintCloud();
+}
+
+/* 파일 저장 — 일반 웹페이지에서는 브라우저가 바로 받아준다 */
+function download(name, text, type){
+  const blob=new Blob(['\ufeff'+text], {type:(type||'text/csv')+';charset=utf-8'});
+  const url=URL.createObjectURL(blob), a=document.createElement('a');
+  a.href=url; a.download=name; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); }, 1000);
+}
+const fileStem=()=>safeSeg(P.pid)+'_'+MODE+'_'+stampNow();
+const safeSeg=s=>(String(s||'').replace(/[^A-Za-z0-9_.~@+-]/g,'-').slice(0,60)||'x');
+function stampNow(){
+  const d=new Date(), p=n=>String(n).padStart(2,'0');
+  return ''+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes());
+}
+function runPayload(agg, derived){
+  return { pid:P.pid, seq:P.seq, mode:MODE, experimenter:P.experimenter||'',
+    toneset:CFG.toneset||'', conditions:(MAIN.order||[]).join(''),
+    startedAt:P.started, finishedAt:new Date().toISOString(),
+    blocks:blocks.length, trialCount:trials.length,
+    summary:agg, derived:derived, csv:Object.assign({},CSV) };
+}
+let LAST=null;
+
+async function saveCloud(agg, derived){
+  LAST=runPayload(agg, derived);
+  const el=$('saveState');
+  // 1) 항상 이 컴퓨터에 파일로 내려받는다.
+  try{
+    download(fileStem()+'.json', JSON.stringify(LAST,null,1), 'application/json');
+    el.className='note';
+    el.innerHTML='<b>결과 파일을 내려받았습니다.</b> 다운로드 폴더의 <code>'+esc(fileStem())+'.json</code> 파일을 담당자에게 보내세요.';
+  }catch(e){
+    el.className='note warn';
+    el.textContent='파일 저장이 막혔습니다. 아래 표를 복사해 전달하세요.';
+  }
+  // 2) 수집 주소가 설정돼 있으면 서버로도 보낸다.
+  if(!ENDPOINT) return;
+  try{
+    await fetch(ENDPOINT, {method:'POST', mode:'no-cors',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify(LAST)});
+    // 브라우저 보안 때문에 응답을 읽을 수 없으므로 도착 여부는 단정하지 않는다.
+    el.innerHTML+='<br>수집 주소로 전송을 보냈습니다. 도착 여부는 시트에서 확인하세요.';
+  }catch(e){
+    el.innerHTML+='<br><b>전송하지 못했습니다.</b> 내려받은 파일을 꼭 보내세요.';
+  }
+}
+function paintCloud(){
+  const f=$('cfgEndpoint'); if(f&&f.value!==ENDPOINT) f.value=ENDPOINT;
+  setCloudStatus(ENDPOINT
+    ? '수집 주소가 설정돼 있습니다. 끝나면 파일 저장과 시트 전송을 모두 합니다.'
+    : '수집 주소가 없습니다. 끝나면 <b>결과 파일이 이 컴퓨터로 내려받아집니다</b> — 그 파일을 담당자에게 보내면 됩니다.');
+}
+function renderCloud(){
+  let h='<thead><tr><th>참가자</th><th>시퀀스</th><th>범위</th><th>알림음</th><th>블록</th><th>끝난 시각</th></tr></thead><tbody>';
+  if(!RUNS.length) h+='<tr><td colspan="6" class="lede">불러온 결과가 없습니다. 아래에서 결과 파일을 선택하세요.</td></tr>';
+  RUNS.forEach(r=>{
+    h+='<tr><td><b>'+esc(r.pid)+'</b></td><td class="n">'+esc(r.seq)+'</td>'+
+       '<td>'+(r.mode==='balance'?'B·C 점검':'전체')+'</td>'+
+       '<td>'+(r.toneset==='pitch'?'음고형':'방향형')+'</td>'+
+       '<td class="n">'+esc(r.blocks)+'</td>'+
+       '<td class="n">'+esc(new Date(r.finishedAt).toLocaleString('ko-KR'))+'</td></tr>';
+  });
+  $('cloudTbl').innerHTML=h+'</tbody>';
+  buildMerge();
+}
+function mergeCsv(key){
+  let head=null; const out=[];
+  RUNS.forEach(r=>{
+    const t=r.csv&&r.csv[key]; if(typeof t!=='string'||!t) return;
+    const lines=t.split('\n'); if(!lines.length) return;
+    if(head===null){ head=lines[0]; out.push(head); }
+    for(let i=1;i<lines.length;i++) if(lines[i].trim()) out.push(lines[i]);
+  });
+  return out.join('\n');
+}
+function buildMerge(){
+  const avail=MERGE_KEYS.filter(k=>RUNS.some(r=>r.csv&&r.csv[k]));
+  if(!avail.length){
+    $('mergeTabs').innerHTML='<span class="lede"><small>합칠 자료가 없습니다.</small></span>';
+    $('mergeOut').value=''; return;
+  }
+  $('mergeTabs').innerHTML=avail.map((k,i)=>
+    '<button type="button" data-k="'+esc(k)+'" aria-pressed="'+(i===0)+'">'+esc(k)+'</button>').join('');
+  $('mergeTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    $('mergeTabs').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed','false'));
+    b.setAttribute('aria-pressed','true');
+    $('mergeOut').value=mergeCsv(b.dataset.k);
+  });
+  $('mergeOut').value=mergeCsv(avail[0]);
+}
+$('btnCloud').onclick=()=>{ renderCloud(); show('s-cloud'); };
+$('btnCloudBack').onclick=()=>show('s-setup');
+$('fileLoad').onchange=async ev=>{
+  const fs=Array.from(ev.target.files||[]);
+  let bad=0;
+  for(const f of fs){
+    try{
+      const o=JSON.parse(await f.text());
+      if(o&&o.pid&&o.csv) RUNS.push(o); else bad++;
+    }catch(e){ bad++; }
+  }
+  RUNS.sort((x,y)=>String(x.finishedAt).localeCompare(String(y.finishedAt)));
+  ev.target.value='';
+  $('loadMsg').textContent=RUNS.length+'건 불러옴'+(bad?(' · '+bad+'개 파일은 형식이 맞지 않아 건너뜀'):'');
+  renderCloud();
+};
+$('btnMergeCopy').onclick=async()=>{
+  const ta=$('mergeOut'), msg=$('mergeMsg').firstElementChild;
+  try{ await navigator.clipboard.writeText(ta.value); msg.textContent='복사했습니다.'; }
+  catch(e){ ta.focus(); ta.select(); msg.textContent='자동 복사가 막혔습니다. Ctrl+C 를 누르세요.'; }
+};
+$('btnMergeSave').onclick=()=>{
+  const b=$('mergeTabs').querySelector('button[aria-pressed="true"]');
+  if(!b) return;
+  download('merged_'+b.dataset.k.replace(/[^가-힣A-Za-z0-9]/g,'_')+'.csv', mergeCsv(b.dataset.k));
+};
+$('btnSaveCsvs').onclick=()=>{
+  if(!LAST) return;
+  Object.keys(LAST.csv).forEach((k,i)=>setTimeout(()=>
+    download(fileStem()+'_'+k.replace(/[^가-힣A-Za-z0-9]/g,'_')+'.csv', LAST.csv[k]), i*350));
+};
+$('btnSaveJson').onclick=()=>{ if(LAST) download(fileStem()+'.json', JSON.stringify(LAST,null,1), 'application/json'); };
+
+/* ════════════ 시작 ════════════ */
+(function init(){
+  const sel=$('seq');
+  WILLIAMS.forEach((w,i)=>{
+    const o=document.createElement('option');
+    o.value=i+1; o.textContent='Q'+(i+1)+' — '+w.join(' · ');
+    sel.appendChild(o);
+  });
+  $('btnQuick').onclick=()=>{
+    $('cfgBlock').value=20; $('cfgAlerts').value=4; $('cfgGapMin').value=3; $('cfgGapMax').value=5;
+    $('cfgRestB').value=3; $('cfgRestC').value=5; $('cfgPractice').value=1; $('cfgLearnN').value=8;
+  };
+  ['cfgTone','cfgAlerts','cfgResp','cfgBlock'].forEach(id=>{
+    $(id).addEventListener('input',readCfg); $(id).addEventListener('change',readCfg);
+  });
+  $('btnSound').onclick=()=>{
+    readCfg(); audio();
+    const msg=$('toneNote');
+    IDS.forEach((id,i)=>setTimeout(()=>{
+      playTone(id);
+      msg.innerHTML='<b>'+toneOf(id).name+'</b> — '+STIM[id].cat+' 알림 ('+STIM[id].label.replace(' 아이콘','')+')';
+      if(i===IDS.length-1) setTimeout(readCfg,1200);
+    }, i*1100));
+  };
+  const toInstr=m=>{
+    MODE=m; readCfg(); readP();
+    const bal=(m==='balance');
+    $('modeNote').hidden=!bal;
+    if(bal) $('modeNote').innerHTML='<b>파일럿 3단계 — 양식 균형 점검</b>입니다. 알림만 제시되는 두 조건(B 시각 단독, C 청각 단독)을 '+
+      '두 블록씩 수행하며, 주 과업이 들어가는 A·D·E는 하지 않습니다. 따라서 본 시행에서는 <b>숫자 대조를 하지 않고</b> 중립 기호 격자의 '+
+      '중앙을 응시한 채 알림에만 반응합니다.';
+    $('btnToPractice').textContent = (CFG.practice>0) ? '주 과업 연습 시작' : '알림 학습 시작';
+    show('s-instr'); setRail('지시문');
+  };
+  $('btnToInstr').onclick=()=>toInstr('full');
+  $('btnBalance').onclick=()=>toInstr('balance');
+  $('btnBackSetup').onclick=()=>{ show('s-setup'); setRail('설정'); };
+  $('btnToPractice').onclick=startRun;
+  $('btnNewRun').onclick=()=>{
+    const n=P.pid.match(/(\d+)$/);
+    if(n) $('pid').value=P.pid.replace(/\d+$/, String(+n[1]+1).padStart(n[1].length,'0'));
+    $('seq').value=(P.seq%10)+1;
+    show('s-setup'); setRail('설정');
+  };
+  $('cfgEndpoint').addEventListener('change',e=>saveEndpoint(e.target.value));
+  loadEndpoint();
+  readCfg();
+  setRail('설정');
+})();
+</script>
+</body>
+</html>
