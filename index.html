@@ -96,8 +96,21 @@ button:disabled{opacity:.45;cursor:not-allowed}
 /* ── 자극 표시면: 조건 간 밝기 표준화를 위해 테마와 무관하게 고정 ── */
 .stage{background:#ffffff;color:#111111;border:1px solid #c9d2d0;border-radius:10px;
   padding:16px;user-select:none}
-.stage .banner{height:54px;display:flex;align-items:center;justify-content:center;
-  border-bottom:1px solid #e2e7e6;margin:-16px -16px 14px;background:#fafbfb}
+/* 시각 알림 위치. 상단 배너는 보고서 3.2절 그대로이고, 표가 길면 시야에서
+   멀어지므로 표 옆에 두는 선택지를 둔다. 양식 비교에 영향을 주는 선택이라
+   어느 쪽으로 돌렸는지 표 D1 에 기록한다. */
+.stage{display:flex;flex-wrap:wrap;position:relative}
+.stage > *{min-width:0}
+.stage .banner{display:flex;align-items:center;justify-content:center;background:#fafbfb}
+.stage.pos-top{flex-direction:column}
+.stage.pos-top .banner{height:54px;width:auto;border-bottom:1px solid #e2e7e6;
+  margin:-16px -16px 14px}
+.stage.pos-left,.stage.pos-right{flex-direction:row;align-items:stretch;gap:14px}
+.stage.pos-left .banner,.stage.pos-right .banner{flex:0 0 76px;align-self:stretch;
+  margin-block:-16px}
+.stage.pos-left .banner{margin-left:-16px;border-right:1px solid #e2e7e6}
+.stage.pos-right .banner{order:2;margin-right:-16px;border-left:1px solid #e2e7e6}
+.stage.pos-left #sheetHost,.stage.pos-right #sheetHost{flex:1}
 .stage .banner svg{width:40px;height:40px;display:none}
 .stage .banner.show svg{display:block}
 /* 두 값을 가까이 둔다. 멀리 떨어뜨리면 눈으로 맞대지 못하고 속으로 읽어
@@ -114,7 +127,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
   border-left:1px solid #e4e9e8}
 .stage.nopick .sheet td{cursor:default}
 .stage.nopick .sheet tr:hover td{background:transparent}
-.fix{text-align:center;font-size:1.5rem;color:#111;padding:6px 0 2px;font-family:var(--font-num)}
+#fix{position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);
+  text-align:center;font-size:1.6rem;color:#111;font-family:var(--font-num);
+  pointer-events:none;z-index:2;text-shadow:0 0 7px #fff,0 0 4px #fff,0 0 2px #fff}
+.stage.pos-right #fix{right:90px}
+.stage.pos-left #fix{left:90px}
 
 /* 계기 */
 .meters{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
@@ -163,6 +180,14 @@ input[type=range]{padding:0;background:transparent;border:0;accent-color:var(--a
 .chip.ok{background:var(--accent-soft);color:var(--good)}
 .chip.no{background:rgba(154,43,43,.14);color:var(--bad)}
 .chip.na{background:var(--sunk);color:var(--faint)}
+.brief{width:100%;border-collapse:collapse;margin-bottom:6px}
+.brief th{width:82px;text-align:left;font-size:.82rem;font-weight:600;color:var(--accent);
+  vertical-align:top;padding:7px 10px 7px 0;white-space:nowrap}
+.brief td{padding:7px 0;font-size:.9rem;vertical-align:top;border-top:1px solid var(--line)}
+.brief td + td{padding-left:14px}
+.brief tr:first-child th,.brief tr:first-child td{border-top:0}
+ol.steps{margin:0 0 6px;padding-left:20px}
+ol.steps li{margin-bottom:5px;font-size:.9rem}
 .note{font-size:.82rem;color:var(--muted);background:var(--sunk);border-left:3px solid var(--line-hard);
   border-radius:0 6px 6px 0;padding:10px 12px;margin:10px 0}
 .note.warn{border-left-color:var(--warn)}
@@ -235,6 +260,14 @@ ul.tight li{margin-bottom:4px}
         <div><label for="cfgLearnCrit">학습 통과 기준 (%)</label><input id="cfgLearnCrit" type="number" value="90" min="50" max="100"></div>
       </div>
       <div style="margin-top:12px">
+        <label for="cfgIconPos">시각 알림 위치</label>
+        <select id="cfgIconPos">
+          <option value="top">화면 상단 배너 (보고서 3.2절)</option>
+          <option value="right">표 오른쪽</option>
+          <option value="left">표 왼쪽</option>
+        </select>
+      </div>
+      <div style="margin-top:12px">
         <label for="cfgTone">알림음 설계</label>
         <select id="cfgTone">
           <option value="dir">방향형 — 상승·하강 (보고서 표 A2)</option>
@@ -278,18 +311,44 @@ ul.tight li{margin-bottom:4px}
   <section id="s-instr" hidden>
     <div class="card">
       <h2>실험 안내</h2>
-      <p><b>주 과업 — 대조 검증.</b> 원본과 입력본 두 열이 나란히 제시됩니다. 열 개 행 중 <b>한 행만</b> 좌우 값이 다릅니다. 그 행을 마우스로 클릭하세요. 맞히면 즉시 다음 표가 나옵니다. 틀린 행을 눌러도 표는 그대로 유지되며 따로 표시가 나타나지 않습니다.</p>
-      <p><b>보조 과업 — 알림 분류.</b> 알림이 오면 <b>업무 알림은 ←</b>, <b>광고 알림은 →</b> 방향키를 누르세요. 알림은 화면 위쪽 배너의 아이콘 또는 이어폰의 알림음으로 0.5초간 제시됩니다. 응답 시간은 <span class="respEcho">3</span>초입니다.</p>
-      <div class="note warn"><b>우선순위.</b> 대조 검증을 최우선으로 수행하되, 알림은 <b>하나도 놓치지 말고</b> 가능한 한 빠르고 정확하게 분류하세요.</div>
-      <p><b>손 배치.</b> 주 과업은 마우스를 쥔 우세손으로, 알림 분류는 <b>비우세손의 방향키</b>로 수행합니다. 실험 내내 이 배치를 유지하세요.</p>
-      <p><b>알림만 제시되는 블록</b>에서는 숫자 대신 중립 기호가 채워진 격자가 나옵니다. 이때는 클릭하지 말고 <b>화면 중앙을 응시</b>한 채 알림에만 반응하세요.</p>
-      <p><b>조건이 바뀔 때마다</b> 먼저 30초 연습을 합니다. 이때는 기록하지 않으니, 알림이 어디에 뜨고 두 과업을 어떻게 번갈아 할지 익히는 데 쓰세요. 화면에 '연습 — 기록하지 않습니다'라고 표시됩니다.</p>
-      <div class="keys"><span class="key">← 업무 알림</span><span class="key">→ 광고 알림</span></div>
+
+      <h3>손 배치</h3>
+      <table class="brief">
+        <tr><th>우세손</th><td>마우스</td><td>대조 검증 — 다른 행을 클릭</td></tr>
+        <tr><th>비우세손</th><td>← →  방향키</td><td>알림 분류 — 업무 ← / 광고 →</td></tr>
+      </table>
+      <p class="lede"><small>실험이 끝날 때까지 이 배치를 바꾸지 마세요.</small></p>
+
+      <h3>두 과업</h3>
+      <table class="brief">
+        <tr><th>주 과업</th><td>원본과 입력본 중 <b>좌우 값이 다른 한 행</b>을 클릭. 맞히면 바로 다음 표가 나오고, 틀리면 아무 표시 없이 그대로입니다.</td></tr>
+        <tr><th>보조 과업</th><td>알림이 <b>0.5초</b> 제시됩니다. <b>업무 ←</b>, <b>광고 →</b>. 응답 시간 <span class="respEcho">3</span>초.</td></tr>
+      </table>
+
+      <div class="note warn"><b>우선순위 — 대조 검증이 먼저입니다.</b> 다만 알림은 <b>하나도 놓치지 마세요.</b></div>
+
+      <h3>진행 순서</h3>
+      <ol class="steps">
+        <li><b>주 과업 연습</b> — 대조 검증에만 익숙해집니다</li>
+        <li><b>알림 학습</b> — 아이콘과 알림음을 각각 외웁니다 (정확도 90%까지)</li>
+        <li><b>조건별 연습</b> — 조건이 바뀔 때마다 먼저 짧게 연습합니다. <b>기록하지 않습니다</b></li>
+        <li><b>측정 블록 2회</b> — 여기서부터 기록됩니다</li>
+        <li><b>설문</b> — 방금 두 블록이 얼마나 부담스러웠는지 답합니다</li>
+      </ol>
+      <p class="lede"><small>조건마다 ③~⑤가 반복됩니다.</small></p>
+
+      <h3>유의할 점</h3>
+      <ul class="tight">
+        <li>이어폰을 착용하고 음량을 미리 맞추세요</li>
+        <li>실험 도중 <b>다른 창이나 탭으로 전환하지 마세요</b> — 전환 시간이 기록됩니다</li>
+        <li>알림만 나오는 블록에서는 숫자 대신 기호 격자가 뜹니다. 클릭하지 말고 <b>화면 중앙을 응시</b>하세요</li>
+      </ul>
+
       <div class="note warn" id="modeNote" hidden></div>
     </div>
     <div class="row end">
       <button id="btnBackSetup">설정으로</button>
-      <button class="primary" id="btnToPractice">주 과업 연습 시작</button>
+      <button class="primary" id="btnToPractice">시작</button>
     </div>
   </section>
 
@@ -324,7 +383,8 @@ ul.tight li{margin-bottom:4px}
       </div>
       <div class="learnbox" id="learnBox"></div>
       <div class="verdict" id="learnVerdict">&nbsp;</div>
-      <div class="keys"><span class="key">← 업무</span><span class="key">→ 광고</span></div>
+      <div class="keys"><span class="key">← 업무</span><span class="key">→ 광고</span>
+        <button type="button" id="btnReplay" hidden>다시 듣기</button></div>
       <div class="bar"><i id="learnBar"></i></div>
     </div>
   </section>
@@ -512,6 +572,8 @@ function readCfg(){
   };
   if(CFG.gapMax<=CFG.gapMin) CFG.gapMax=CFG.gapMin+1;
   CFG.colGap=+$('cfgGap').value;
+  CFG.iconPos=$('cfgIconPos').value;
+  $('stage').className='stage pos-'+CFG.iconPos;
   $('stage').style.setProperty('--gap', CFG.colGap+'ch');
   TONESET=$('cfgTone').value;
   CFG.toneset=TONESET;
@@ -579,12 +641,21 @@ function makeOrder(r){
 
 /* ════════════ 소리 ════════════ */
 let AC=null;
-function audio(){ if(!AC) AC=new (window.AudioContext||window.webkitAudioContext)();
-  if(AC.state==='suspended') AC.resume(); return AC; }
+function audio(){
+  if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; } }
+  if(AC.state!=='running') AC.resume().catch(()=>{});   // 탭이 가려지면 다시 잠기므로 매번 깨운다
+  return AC;
+}
+async function armAudio(){
+  const ac=audio(); if(!ac) return false;
+  if(ac.state!=='running'){ try{ await ac.resume(); }catch(e){} }
+  return ac.state==='running';
+}
 function toneOf(id){ return TONESETS[TONESET][id]; }
 function playTone(id){
-  const ac=audio(), f=toneOf(id).seq, durs=TONE_DURS[f.length];
-  let t=ac.currentTime+0.004;
+  const ac=audio(); if(!ac) return;
+  const f=toneOf(id).seq, durs=TONE_DURS[f.length];
+  let t=ac.currentTime+0.03;   // resume 직후 첫 음이 잘리지 않도록 여유를 둔다
   f.forEach((hz,i)=>{
     const d=durs[i]/1000, o=ac.createOscillator(), g=ac.createGain();
     o.type='sine'; o.frequency.setValueAtTime(hz,t);
@@ -636,7 +707,7 @@ function startBlock(opts){
   $('runTag').textContent = opts.practice ? ('연습 '+opts.blockNo+'/'+CFG.practice)
     : (warm ? '연습 — 기록하지 않습니다'
             : ('블록 '+opts.blockNo+'/'+((MAIN.order&&MAIN.order.length)?MAIN.order.length*2:10)+' · 자극 세트 S'+opts.setIdx));
-  $('stage').classList.toggle('nopick', !cond.primary);
+  $('stage').className='stage pos-'+(CFG.iconPos||'top')+(cond.primary?'':' nopick');
   $('fix').hidden = cond.primary;
   $('banner').classList.remove('show'); $('banner').innerHTML='';
   $('mDone').textContent='0'; $('mMiss').textContent='0'; $('mAlert').textContent='0';
@@ -777,6 +848,7 @@ function nextLearnItem(){
     box.innerHTML='<span class="snd">♪ 듣고 응답하세요</span>';
     try{playTone(id);}catch(e){}
   }
+  $('btnReplay').hidden = (LEARN.modality==='visual');
   LEARN.cur=id; LEARN.waiting=true; LEARN.t0=performance.now();
 }
 function learnAnswer(key,t){
@@ -919,9 +991,9 @@ function askTlx(cond){
       runNextMainBlock);
   };
 }
-function startRun(){
+async function startRun(){
   readCfg(); readP();
-  audio();
+  await armAudio();      // 브라우저는 클릭 없이는 소리를 내지 않는다. 시작 클릭에서 확실히 깨운다.
   const r=mulberry32(4242+(P.seq||1));
   schedule=makeSchedule(r); order=makeOrder(r);
   blocks=[]; trials=[]; tlx={}; practiceLog=[]; learnLog=[];
@@ -1039,6 +1111,7 @@ function buildCsv(agg, derived){
     알림음설계:(TONESETS[CFG.toneset]||{}).label||CFG.toneset,
     숫자자릿수:CFG.digits, 표행수:CFG.rows, 블록길이s:CFG.blockMs/1000,
     블록당알림:CFG.nAlerts, 응답제한s:CFG.respMs/1000, 두열간격ch:CFG.colGap,
+    시각알림위치:CFG.iconPos,
     실험일시:P.started, 실험자:P.experimenter
   }]);
   CSV['표 D2 블록별 기록']=toCsv(blocks.map(b=>({
@@ -1118,6 +1191,11 @@ $('btnRestore').onclick=()=>{
   show('s-hist');
 };
 $('btnHistBack').onclick=()=>show('s-setup');
+$('btnReplay').onclick=async()=>{          // 소리가 안 났을 때를 위한 장치. 학습 단계에서만 쓴다.
+  if(!LEARN||!LEARN.waiting) return;
+  await armAudio();
+  try{ playTone(LEARN.cur); }catch(e){}
+};
 
 /* ════════════ 결과 내보내기 / 선택적 서버 전송 ════════════ */
 let RUNS=[], ENDPOINT='';
