@@ -57,7 +57,7 @@ function appendSummary(ss, run) {
     s.setFrozenRows(1);
   }
   s.appendRow([new Date(), run.pid, run.seq,
-               run.mode === 'balance' ? 'B·C 점검' : '전체',
+               {balance:'B·C 점검', primary:'A 난이도'}[run.mode] || '전체',
                run.toneset === 'pitch' ? '음고형' : '방향형',
                run.conditions, run.blocks, run.trialCount,
                run.startedAt, run.finishedAt, run.experimenter]);

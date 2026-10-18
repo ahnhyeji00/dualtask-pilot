@@ -1171,7 +1171,9 @@ function renderPrimaryVerdict(){
   $('verdictCard').querySelector('h2').textContent='주 과업 난이도 판정';
   if(!bs.length){ $('verdictTbl').innerHTML='<tbody><tr><td>완료한 표가 없습니다.</td></tr></tbody>'; return; }
   const sec=bs.reduce((a,b)=>a+b.secPerTable,0)/bs.length;
-  const per90=90/sec;
+  // 부록 B 의 목표는 '90초당 처리량'이다. 90/표당소요 로 추정하면 블록 끝의
+  // 못 끝낸 표가 빠져 실제보다 높게 나오므로, 완료한 표 수를 그대로 환산한다.
+  const per90=(bs.reduce((a,b)=>a+b.throughput,0)/bs.length)*(90000/CFG.blockMs);
   const miss=bs.reduce((a,b)=>a+b.misclicks,0);
   const ok=(per90>=6 && per90<=10);
   let advice;
@@ -1182,10 +1184,12 @@ function renderPrimaryVerdict(){
   else              advice='목표 범위에 들어옵니다. <b>이 설정으로 본실험을 진행하세요.</b>';
   const chip=v=>v? '<span class="chip ok">통과</span>' : '<span class="chip no">조정 필요</span>';
   const rows=[
-    ['표당 평균 소요', sec.toFixed(2)+'초', '9~15초', ok],
     ['90초당 처리량', per90.toFixed(1)+'개', '6~10개 (부록 B)', ok],
+    ['표당 평균 소요', sec.toFixed(2)+'초', '참고 — 완료한 표만', null],
     ['블록별 처리량', bs.map(b=>b.throughput).join(', ')+'개', '블록 길이 '+(CFG.blockMs/1000)+'초', null],
-    ['오클릭 합계', miss+'회', '많으면 자릿수가 과한 것', null]
+    ['오클릭 합계', miss+'회', '많으면 자릿수가 과한 것', null],
+    ['측정의 결이', per90<6 ? '거칩니다' : '충분합니다',
+     '블록당 표가 적으면 이중 과업 비용이 한두 개 차이로만 보인다', per90>=6]
   ];
   $('verdictTbl').innerHTML='<thead><tr><th>항목</th><th>결과</th><th>기준</th><th>판정</th></tr></thead><tbody>'
     + rows.map(r=>'<tr><td>'+r[0]+'</td><td class="n">'+r[1]+'</td><td><small>'+r[2]+'</small></td><td>'
