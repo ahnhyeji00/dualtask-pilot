@@ -221,6 +221,7 @@ ul.tight li{margin-bottom:4px}
 <div class="wrap">
   <div class="top">
     <h1>알림 양식 이중과업 과업 페이지</h1>
+    <span class="badge" id="buildTag" title="이 숫자가 공지된 것과 다르면 Ctrl+Shift+R 로 새로고침하세요">—</span>
     <span class="badge" id="railTag">설정</span>
   </div>
 
@@ -607,7 +608,8 @@ function shuffle(r,arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const 
 /* ════════════ 설정 / 상태 ════════════ */
 const $=id=>document.getElementById(id);
 let CFG={}, P={}, RUN=null;
-let MODE='full';          // 'full' = 전체 실험, 'balance' = 파일럿 3단계(B·C 균형 점검)
+let MODE='full';
+const BUILD='2026-10-18 14:41';   // 배포 시각(UTC). 캐시된 옛 판으로 돌리는 일을 막기 위해 화면과 기록에 남긴다.          // 'full' = 전체 실험, 'balance' = 파일럿 3단계(B·C 균형 점검)
 let blocks=[], trials=[], tlx={}, practiceLog=[], learnLog=[];
 let schedule=[], order=[];
 
@@ -1256,7 +1258,7 @@ function buildCsv(agg, derived){
     알림음설계:(TONESETS[CFG.toneset]||{}).label||CFG.toneset,
     숫자자릿수:CFG.digits, 표행수:CFG.rows, 블록길이s:CFG.blockMs/1000,
     블록당알림:CFG.nAlerts, 응답제한s:CFG.respMs/1000, 두열간격ch:CFG.colGap,
-    시각알림위치:CFG.iconPos,
+    시각알림위치:CFG.iconPos, 페이지판:BUILD,
     실험일시:P.started, 실험자:P.experimenter
   }]);
   CSV['표 D2 블록별 기록']=toCsv(blocks.map(b=>({
@@ -1540,6 +1542,7 @@ $('btnSaveJson').onclick=()=>{ if(LAST) download(fileStem()+'.json', JSON.string
 
 /* ════════════ 시작 ════════════ */
 (function init(){
+  $('buildTag').textContent='판 '+BUILD;
   $('pid').addEventListener('input', paintSeq);
   paintSeq();
   $('btnSoundCheck').onclick=runSoundCheck;
