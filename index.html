@@ -188,6 +188,20 @@ input[type=range]{padding:0;background:transparent;border:0;accent-color:var(--a
 .brief tr:first-child th,.brief tr:first-child td{border-top:0}
 ol.steps{margin:0 0 6px;padding-left:20px}
 ol.steps li{margin-bottom:5px;font-size:.9rem}
+.readout{background:var(--sunk);border:1px solid var(--line);border-radius:7px;
+  padding:8px 10px;font-size:.88rem;line-height:1.45}
+.readout b{color:var(--accent)}
+details.card>summary{cursor:pointer;font-size:.95rem;list-style:none;
+  display:flex;align-items:center;gap:8px}
+details.card>summary::-webkit-details-marker{display:none}
+details.card>summary::before{content:"▸";color:var(--muted);font-size:.9em}
+details.card[open]>summary::before{content:"▾"}
+details.card>summary:hover{color:var(--accent)}
+details.card[open]>summary{margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.shout{font-size:1.28rem;font-weight:600;color:var(--bad);text-align:center;
+  letter-spacing:-.01em;margin:10px 0 6px}
+.shout u{text-decoration-thickness:2px;text-underline-offset:3px}
+#posDiagram svg{width:100%;max-width:260px;height:auto;display:block}
 .note{font-size:.82rem;color:var(--muted);background:var(--sunk);border-left:3px solid var(--line-hard);
   border-radius:0 6px 6px 0;padding:10px 12px;margin:10px 0}
 .note.warn{border-left-color:var(--warn)}
@@ -217,16 +231,14 @@ ul.tight li{margin-bottom:4px}
     <div class="card">
       <h2>참가자 정보</h2>
       <div class="grid two">
-        <div><label for="pid">참가자 ID</label><input id="pid" value="P01"></div>
-        <div><label for="seq">Williams 시퀀스 (1–10)</label>
-          <select id="seq"></select></div>
+        <div><label for="pid">참가자 ID</label><input id="pid" value="P03" autocomplete="off"></div>
+        <div><label for="seqView">조건 순서 (ID로 자동 배정)</label>
+          <div id="seqView" class="readout">—</div></div>
         <div><label for="hand">주 사용 손</label>
           <select id="hand"><option>오른손</option><option>왼손</option></select></div>
         <div><label for="sex">성별</label>
           <select id="sex"><option>여</option><option>남</option><option>응답 안 함</option></select></div>
         <div><label for="age">연령</label><input id="age" type="number" value="21" min="18" max="40"></div>
-        <div><label for="major">전공</label>
-          <select id="major"><option>공학</option><option>비공학</option></select></div>
         <div><label for="sleep">전일 수면 시간 (h)</label><input id="sleep" type="number" value="7" step="0.5" min="0" max="14"></div>
         <div><label for="caf">2시간 내 카페인 섭취</label>
           <select id="caf"><option>없음</option><option>있음</option></select></div>
@@ -241,7 +253,27 @@ ul.tight li{margin-bottom:4px}
     </div>
 
     <div class="card">
-      <h2>파일럿 조정값</h2>
+      <h2>알림 확인</h2>
+      <p class="lede">실험을 시작하기 전에 참가자와 함께 확인하세요.</p>
+      <div class="grid two">
+        <div>
+          <h3>시각 알림 — 어디에 뜨는지</h3>
+          <div id="posDiagram"></div>
+          <p style="margin-top:8px"><small id="posWhere"></small></p>
+        </div>
+        <div>
+          <h3>청각 알림 — 어떤 소리인지</h3>
+          <table class="brief" id="soundTbl"></table>
+          <div class="row" style="margin-top:10px">
+            <button class="primary" id="btnSoundCheck">소리 확인 — 네 가지 듣기</button>
+          </div>
+          <p style="margin:10px 0 0"><small id="soundStatus" class="lede">이어폰을 끼고 눌러보세요. 네 가지 소리가 차례로 납니다.</small></p>
+        </div>
+      </div>
+    </div>
+
+    <details class="card" id="cfgBox">
+      <summary><b>파일럿 조정값</b> — 실험자만 건드리세요</summary>
       <p class="lede"><small>부록 B에 따라 자릿수와 행 수를 조정해 90초당 처리량이 6–10개에 들어오도록 맞춥니다.</small></p>
       <div class="grid three">
         <div><label for="cfgDigits">숫자 자릿수</label><input id="cfgDigits" type="number" value="8" min="3" max="14"></div>
@@ -278,14 +310,13 @@ ul.tight li{margin-bottom:4px}
       <div class="note warn" id="toneNote"></div>
       <div class="note" id="mixNote"></div>
       <div class="note">알림 시간표는 사전에 한 번 생성해 <b>모든 조건에 동일하게</b> 적용합니다. 첫 알림은 시작 후 최소 간격 이후, 마지막 알림은 블록 종료 최소 <span id="echoResp">3</span>초 전에 제시됩니다.</div>
-    </div>
+    </details>
 
     <div class="card flat">
       <h3>점검용</h3>
       <div class="row">
         <button id="btnQuick">짧게 설정 (페이지 작동 확인용)</button>
         <button id="btnDefaults">기본값으로</button>
-        <button id="btnSound">알림음 4종 들어보기</button>
         <button id="btnCloud">결과 모아 보기</button>
         <button id="btnRestore">이 기기 기록</button>
       </div>
@@ -326,7 +357,11 @@ ul.tight li{margin-bottom:4px}
         <tr><th>보조 과업</th><td>알림이 <b>0.5초</b> 제시됩니다. <b>업무 ←</b>, <b>광고 →</b>. 응답 시간 <span class="respEcho">3</span>초. 아이콘은 <b id="posEcho">표 오른쪽</b>에 뜹니다.</td></tr>
       </table>
 
-      <div class="note warn"><b>우선순위 — 대조 검증이 먼저입니다.</b> 다만 알림은 <b>하나도 놓치지 마세요.</b></div>
+      <div class="note warn">
+        <b>우선순위 — 대조 검증이 먼저입니다.</b> 다만 알림은 <b>하나도 놓치지 마세요.</b>
+        <div class="shout">빠르게보다 <u>정확하게</u></div>
+        급하게 누르면 틀립니다. 알림이 무엇인지 <b>확인하고</b> 누르세요. 0.1초 빠른 것보다 맞히는 것이 중요합니다.
+      </div>
 
       <div class="note warn"><b>알림만 나오는 블록 — 반드시 가운데 ＋를 보세요.</b><br>
       숫자 대신 ○ 기호가 채워진 격자가 뜹니다. 이때는 <b>클릭하지 말고</b>, 화면 한가운데의
@@ -585,6 +620,7 @@ function readCfg(){
   CFG.colGap=+$('cfgGap').value;
   CFG.iconPos=$('cfgIconPos').value;
   $('stage').className='stage pos-'+CFG.iconPos;
+  if($('posDiagram')) paintCheck();
   $('posNote').innerHTML = (CFG.iconPos==='top')
     ? '상단 배너는 보고서 3.2절 표기 그대로입니다. 다만 표가 길면 아래쪽 행을 볼 때 아이콘이 시야에서 멀어져, <b>못 봐서 늦은 것이 시각 양식 탓으로</b> 잡힐 수 있습니다.'
     : '아이콘을 표 옆에 두어 어느 행을 보든 거리가 비슷하게 맞췄습니다. 보고서 3.2절에는 ‘화면 상단 배너’로 적혀 있으므로, <b>본보고서에 위치를 바꾼 사실과 이유를 적어야 합니다.</b>';
@@ -603,11 +639,37 @@ function readCfg(){
   document.querySelectorAll('.respEcho').forEach(e=>e.textContent=(CFG.respMs/1000));
   $('echoResp').textContent=(CFG.respMs/1000);
 }
+/* 참가자 ID 끝의 번호로 조건 순서를 정한다. 사람이 고르면 빠뜨리거나 몰리는데,
+   A01~A20 을 1~10 시퀀스에 두 명씩 돌리면 배정이 저절로 균등해진다.
+   균형 점검은 B·C 두 조건뿐이라 번호의 짝수·홀수로 순서를 뒤집는다. */
+function numOfId(pid){
+  const m=String(pid||'').match(/(\d+)\s*$/);
+  if(!m) return null;
+  const v=parseInt(m[1],10);
+  return (isFinite(v) && v>0) ? v : null;
+}
+const seqOfNum = v => ((v-1)%10)+1;
+const balanceOrder = v => (v%2===0) ? ['B','C'] : ['C','B'];
+
 function readP(){
-  P={pid:$('pid').value.trim()||'P00', seq:+$('seq').value, hand:$('hand').value,
-     sex:$('sex').value, age:$('age').value, major:$('major').value, sleep:$('sleep').value,
+  const pid=$('pid').value.trim()||'P00';
+  const num=numOfId(pid);
+  P={pid:pid, num:num||1, seq:num?seqOfNum(num):1, autoSeq:!!num,
+     hand:$('hand').value, sex:$('sex').value, age:$('age').value, sleep:$('sleep').value,
      caffeine:$('caf').value, vision:$('vis').value, colorv:$('cv').value, hearing:$('hear').value,
      experimenter:$('expr').value.trim(), started:new Date().toISOString()};
+}
+function paintSeq(){
+  const pid=$('pid').value.trim(), num=numOfId(pid);
+  const el=$('seqView');
+  if(num===null){
+    el.innerHTML='<b style="color:var(--bad)">ID 끝에 번호가 없습니다.</b> P03, A07 처럼 번호로 끝나게 적어 주세요.';
+    return;
+  }
+  const q=seqOfNum(num), bc=balanceOrder(num);
+  el.innerHTML='참가자 번호 <b>'+num+'</b><br>'
+    + '전체 실험 → <b>Q'+q+'</b> · '+WILLIAMS[q-1].join(' · ')+'<br>'
+    + 'B·C 점검 → <b>'+bc.join(' · ')+'</b>';
 }
 
 /* ════════════ 주 과업 자극 ════════════ */
@@ -950,7 +1012,7 @@ let MAIN={condIdx:0, blockInCond:0, blockNo:0, order:[]};
 function beginMain(){
   // 균형 점검 모드에서는 알림 단독 두 조건만 수행하고, 순서는 참가자 사이에서 교대한다.
   const ord = (MODE==='balance')
-    ? (P.seq%2===1 ? ['B','C'] : ['C','B'])
+    ? balanceOrder(P.num)
     : WILLIAMS[P.seq-1];
   MAIN={condIdx:0, blockInCond:0, blockNo:0, order:ord, warmed:false};
   setRail('본 시행');
@@ -1136,7 +1198,7 @@ function toCsv(rows){ if(!rows.length) return '';
   const k=Object.keys(rows[0]); return [k.join(',')].concat(rows.map(r=>k.map(x=>q(r[x])).join(','))).join('\n'); }
 function buildCsv(agg, derived){
   CSV['표 D1 참가자 정보']=toCsv([{
-    참가자ID:P.pid, 시퀀스:P.seq, 주사용손:P.hand, 성별:P.sex, 연령:P.age, 전공:P.major,
+    참가자ID:P.pid, 시퀀스:P.seq, 주사용손:P.hand, 성별:P.sex, 연령:P.age,
     전일수면h:P.sleep, 카페인2h:P.caffeine, 교정후식별:P.vision, 색각이상:P.colorv, 청력이상:P.hearing,
     시각학습블록:(learnState.acc.visual||{}).blocks??'', 시각학습정확도:(learnState.acc.visual||{}).acc??'',
     청각학습블록:(learnState.acc.audio||{}).blocks??'', 청각학습정확도:(learnState.acc.audio||{}).acc??'',
@@ -1296,6 +1358,58 @@ async function saveCloud(agg, derived){
     el.innerHTML+='<br><b>전송하지 못했습니다.</b> 내려받은 파일을 꼭 보내세요.';
   }
 }
+function paintCheck(){
+  const pos=CFG.iconPos||'right';
+  const C={right:{bx:150,by:28,bw:34,bh:104, tx:26,tw:118},
+           left:{bx:26,by:28,bw:34,bh:104,  tx:70,tw:118},
+           top:{bx:26,by:28,bw:162,bh:26,   tx:26,tw:162}}[pos];
+  const ty = pos==='top' ? 62 : 28, th = pos==='top' ? 70 : 104;
+  let rows='';
+  for(let i=0;i<5;i++){
+    const y=ty+12+i*((th-18)/4);
+    rows+='<line x1="'+(C.tx+8)+'" y1="'+y+'" x2="'+(C.tx+C.tw/2-6)+'" y2="'+y+'" />'
+        + '<line x1="'+(C.tx+C.tw/2+6)+'" y1="'+y+'" x2="'+(C.tx+C.tw-8)+'" y2="'+y+'" />';
+  }
+  $('posDiagram').innerHTML =
+    '<svg viewBox="0 0 214 160" role="img" aria-label="알림이 뜨는 위치">'
+    + '<rect x="14" y="16" width="186" height="128" rx="8" fill="none" stroke="currentColor" stroke-opacity=".35"/>'
+    + '<rect x="'+C.tx+'" y="'+ty+'" width="'+C.tw+'" height="'+th+'" rx="4" fill="currentColor" fill-opacity=".04"/>'
+    + '<g stroke="currentColor" stroke-opacity=".3" stroke-width="3" stroke-linecap="round">'+rows+'</g>'
+    + '<rect x="'+C.bx+'" y="'+C.by+'" width="'+C.bw+'" height="'+C.bh+'" rx="4" '
+    +   'fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>'
+    + '<g transform="translate('+(C.bx+C.bw/2-9)+','+(C.by+C.bh/2-9)+') scale(0.07)" '
+    +   'fill="none" stroke="var(--accent)" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">'
+    +   ICON.W1 + '</g>'
+    + '<text x="107" y="155" text-anchor="middle" font-size="9" fill="currentColor" fill-opacity=".6">'
+    +   '회색 = 대조 검증 표 · 초록 = 알림</text>'
+    + '</svg>';
+  $('posWhere').innerHTML = {right:'알림은 <b>표 오른쪽</b>에 0.5초 동안 나타납니다.',
+    left:'알림은 <b>표 왼쪽</b>에 0.5초 동안 나타납니다.',
+    top:'알림은 <b>화면 위쪽 띠</b>에 0.5초 동안 나타납니다.'}[pos]
+    + ' 작고 잠깐이니 미리 어디인지 확인해 두세요.';
+
+  const up = (CFG.toneset||'dir')==='dir';
+  $('soundTbl').innerHTML =
+    '<tr><th>업무 ←</th><td>'+(up?'음이 <b>올라가는</b> 소리':'<b>낮은</b> 소리')+'</td></tr>'
+  + '<tr><th>광고 →</th><td>'+(up?'음이 <b>내려가는</b> 소리':'<b>높은</b> 소리')+'</td></tr>'
+  + '<tr><th>길이</th><td>각각 0.5초. 범주마다 두 가지씩 있습니다.</td></tr>';
+}
+let soundBusy=false;
+async function runSoundCheck(){
+  if(soundBusy) return;
+  soundBusy=true;
+  const st=$('soundStatus');
+  const ok=await armAudio();
+  if(!ok){ st.innerHTML='<b style="color:var(--bad)">소리를 켜지 못했습니다.</b> 브라우저 음소거와 기기 음량을 확인하고 다시 눌러 주세요.'; soundBusy=false; return; }
+  for(const id of IDS){
+    st.innerHTML='지금 — <b>'+toneOf(id).name+'</b> → '+STIM[id].cat+' 알림';
+    try{ playTone(id); }catch(e){}
+    await new Promise(r=>setTimeout(r,1200));
+  }
+  st.innerHTML='네 가지를 모두 재생했습니다. <b>들리지 않았다면 음량을 올리고 다시</b> 눌러 주세요.';
+  soundBusy=false;
+}
+
 function paintCloud(){
   const f=$('cfgEndpoint'); if(f&&f.value!==ENDPOINT) f.value=ENDPOINT;
   setCloudStatus(ENDPOINT
@@ -1375,12 +1489,9 @@ $('btnSaveJson').onclick=()=>{ if(LAST) download(fileStem()+'.json', JSON.string
 
 /* ════════════ 시작 ════════════ */
 (function init(){
-  const sel=$('seq');
-  WILLIAMS.forEach((w,i)=>{
-    const o=document.createElement('option');
-    o.value=i+1; o.textContent='Q'+(i+1)+' — '+w.join(' · ');
-    sel.appendChild(o);
-  });
+  $('pid').addEventListener('input', paintSeq);
+  paintSeq();
+  $('btnSoundCheck').onclick=runSoundCheck;
   // 값만 바꾸면 아래 안내문이 옛 숫자를 그대로 띄워 눌리지 않은 것처럼 보인다.
   // 설정을 다시 읽고 버튼에 적용 사실을 잠깐 표시한다.
   const QUICK={cfgBlock:20, cfgAlerts:4, cfgGapMin:3, cfgGapMax:5, cfgResp:2,
@@ -1401,15 +1512,6 @@ $('btnSaveJson').onclick=()=>{ if(LAST) download(fileStem()+'.json', JSON.string
     .forEach(id=>{
     $(id).addEventListener('input',readCfg); $(id).addEventListener('change',readCfg);
   });
-  $('btnSound').onclick=()=>{
-    readCfg(); audio();
-    const msg=$('toneNote');
-    IDS.forEach((id,i)=>setTimeout(()=>{
-      playTone(id);
-      msg.innerHTML='<b>'+toneOf(id).name+'</b> — '+STIM[id].cat+' 알림 ('+STIM[id].label.replace(' 아이콘','')+')';
-      if(i===IDS.length-1) setTimeout(readCfg,1200);
-    }, i*1100));
-  };
   const toInstr=m=>{
     MODE=m; readCfg(); readP();
     const bal=(m==='balance');
@@ -1428,7 +1530,7 @@ $('btnSaveJson').onclick=()=>{ if(LAST) download(fileStem()+'.json', JSON.string
   $('btnNewRun').onclick=()=>{
     const n=P.pid.match(/(\d+)$/);
     if(n) $('pid').value=P.pid.replace(/\d+$/, String(+n[1]+1).padStart(n[1].length,'0'));
-    $('seq').value=(P.seq%10)+1;
+    paintSeq(); readCfg();
     show('s-setup'); setRail('설정');
   };
   $('cfgEndpoint').addEventListener('change',e=>saveEndpoint(e.target.value));
