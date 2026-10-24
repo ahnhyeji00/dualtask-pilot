@@ -433,6 +433,7 @@ ul.tight li{margin-bottom:4px}
         <h2 id="learnTitle" style="margin:0">알림 학습</h2>
         <span class="badge" id="learnTag">—</span>
       </div>
+      <p class="lede" style="margin:0 0 10px"><small id="learnHint"></small></p>
       <div class="learnbox" id="learnBox"></div>
       <div class="verdict" id="learnVerdict">&nbsp;</div>
       <div class="keys"><span class="key">← 업무</span><span class="key">→ 광고</span>
@@ -609,7 +610,7 @@ function shuffle(r,arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const 
 const $=id=>document.getElementById(id);
 let CFG={}, P={}, RUN=null;
 let MODE='full';
-const BUILD='2026-10-18 14:41';   // 배포 시각(UTC). 캐시된 옛 판으로 돌리는 일을 막기 위해 화면과 기록에 남긴다.          // 'full' = 전체 실험, 'balance' = 파일럿 3단계(B·C 균형 점검)
+const BUILD='2026-10-24 06:07';   // 배포 시각(UTC). 캐시된 옛 판으로 돌리는 일을 막기 위해 화면과 기록에 남긴다.          // 'full' = 전체 실험, 'balance' = 파일럿 3단계(B·C 균형 점검)
 let blocks=[], trials=[], tlx={}, practiceLog=[], learnLog=[];
 let schedule=[], order=[];
 
@@ -934,6 +935,9 @@ function startLearn(modality, blockNo){
   LEARN={modality, blockNo, items:shuffle(r,seq).slice(0,CFG.learnN), i:0, ok:0, waiting:false, t0:0};
   show('s-learn'); setRail('학습');
   $('learnTitle').textContent='알림 학습 — '+(modality==='visual'?'시각 (아이콘)':'청각 (알림음)');
+  $('learnHint').textContent = (modality==='visual')
+    ? '이 아이콘이 업무 알림인지 광고 알림인지 고르세요. 아이콘은 답할 때까지 그대로 있습니다.'
+    : '방금 들린 소리가 업무 알림인지 광고 알림인지 고르세요. 못 들었으면 다시 듣기를 누르세요.';
   nextLearnItem();
 }
 function nextLearnItem(){
@@ -944,8 +948,11 @@ function nextLearnItem(){
   $('learnVerdict').textContent=' '; $('learnVerdict').className='verdict';
   const box=$('learnBox');
   if(LEARN.modality==='visual'){
+    // 학습 단계에서는 아이콘을 응답할 때까지 띄워 둔다. 0.5초만 비추면 '무엇이
+    // 떴는지 기억하는 부담'까지 얹혀 매핑 학습이 느려진다. 실제로 파일럿에서
+    // 세 명 중 두 명이 시각 학습에만 두 블록이 걸렸고, 규칙 하나로 끝나는
+    // 청각은 전원 한 블록이었다. 0.5초 노출 연습은 조건별 연습과 본 블록이 맡는다.
     box.innerHTML=iconSvg(id); box.style.color='#111';
-    setTimeout(()=>{ if(LEARN&&LEARN.waiting) box.innerHTML='<span class="snd">응답하세요</span>'; },STIM_MS);
   }else{
     box.innerHTML='<span class="snd">♪ 듣고 응답하세요</span>';
     try{playTone(id);}catch(e){}
