@@ -202,6 +202,16 @@ details.card[open]>summary{margin-bottom:12px;padding-bottom:10px;border-bottom:
   letter-spacing:-.01em;margin:10px 0 6px}
 .shout u{text-decoration-thickness:2px;text-underline-offset:3px}
 #posDiagram svg{width:100%;max-width:260px;height:auto;display:block}
+#pauseBox{position:fixed;inset:0;z-index:50;background:rgba(10,20,19,.82);
+  display:flex;align-items:center;justify-content:center;
+  padding:max(16px,env(safe-area-inset-left,0px))}
+.pausePanel{background:var(--panel);border:2px solid var(--bad);border-radius:12px;
+  padding:24px;max-width:520px;box-shadow:0 18px 60px rgba(0,0,0,.4)}
+.pausePanel h2{color:var(--bad);margin-bottom:10px}
+.keycheck{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+.keycheck span{font-family:var(--font-num);font-size:.92rem;border:2px solid var(--line-hard);
+  border-radius:8px;padding:9px 16px;color:var(--muted);transition:none}
+.keycheck span.hit{border-color:var(--good);color:var(--good);background:var(--accent-soft);font-weight:600}
 .note{font-size:.82rem;color:var(--muted);background:var(--sunk);border-left:3px solid var(--line-hard);
   border-radius:0 6px 6px 0;padding:10px 12px;margin:10px 0}
 .note.warn{border-left-color:var(--warn)}
@@ -268,7 +278,9 @@ ul.tight li{margin-bottom:4px}
           <div class="row" style="margin-top:10px">
             <button class="primary" id="btnSoundCheck">소리 확인 — 네 가지 듣기</button>
           </div>
-          <p style="margin:10px 0 0"><small id="soundStatus" class="lede">이어폰을 끼고 눌러보세요. 네 가지 소리가 차례로 납니다. <b>현재 오류로 인해 두 번째 시도부터 제대로 들리니 최소 두 번 이상 실행해주세요!</b></small></p>
+          <h3 style="margin-top:16px">방향키 확인</h3>
+          <div class="keycheck" id="setupKeys"></div>
+          <p style="margin:10px 0 0"><small id="soundStatus" class="lede">이어폰을 끼고 눌러보세요. 네 가지 소리가 차례로 납니다.</small></p>
         </div>
       </div>
     </div>
@@ -491,6 +503,17 @@ ul.tight li{margin-bottom:4px}
     <div class="row end"><button id="btnNewRun">새 참가자 시작</button></div>
   </section>
 
+  <!-- ══════════ 중단 경고 (블록 중 포커스·키 이상) ══════════ -->
+  <div id="pauseBox" hidden>
+    <div class="pausePanel">
+      <h2>실험이 멈췄습니다</h2>
+      <p id="pauseReason" class="lede"></p>
+      <p>아래 <b>방향키 두 개를 눌러</b> 키보드가 작동하는지 확인하세요. 확인되면 <b>이 블록을 처음부터 다시</b> 시작합니다.</p>
+      <div class="keycheck" id="pauseKeys"></div>
+      <p><small class="lede">이 화면이 떴다는 것은 응답이 기록되지 않고 있었다는 뜻입니다. 실험자에게 알리세요.</small></p>
+    </div>
+  </div>
+
   <!-- ══════════ 모은 결과 (공유 저장소) ══════════ -->
   <section id="s-cloud" hidden>
     <div class="card">
@@ -610,7 +633,7 @@ function shuffle(r,arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const 
 const $=id=>document.getElementById(id);
 let CFG={}, P={}, RUN=null;
 let MODE='full';
-const BUILD='2026-10-24 06:07';   // 배포 시각(UTC). 캐시된 옛 판으로 돌리는 일을 막기 위해 화면과 기록에 남긴다.          // 'full' = 전체 실험, 'balance' = 파일럿 3단계(B·C 균형 점검)
+const BUILD='2026-10-26 00:27';   // 배포 시각(UTC). 캐시된 옛 판으로 돌리는 일을 막기 위해 화면과 기록에 남긴다.          // 'full' = 전체 실험, 'balance' = 파일럿 3단계(B·C 균형 점검)
 let blocks=[], trials=[], tlx={}, practiceLog=[], learnLog=[];
 let schedule=[], order=[];
 
@@ -800,7 +823,7 @@ function startBlock(opts){
     tableTimes:[], alertIdx:0, pending:null, rng,
     order:makeOrder(mulberry32(31337+opts.setIdx*101+(P.seq||1))),
     rowState:{bag:[], last:-1},
-    alerts:[], timer:0, hiddenMs:0, tbl:null
+    alerts:[], timer:0, hiddenMs:0, missStreak:0, paused:false, tbl:null
   };
   show('s-run');
   const warm=!!opts.warmup;
@@ -844,6 +867,72 @@ function onRowClick(i){
     RUN.misclicks++; $('mMiss').textContent=RUN.misclicks; // 시각 피드백 없음
   }
 }
+/* 응답이 안 들어가는 사고를 막는 장치.
+   전체 화면으로 다른 창을 덮고, 그래도 포커스를 잃거나 연속으로 응답이
+   비면 블록을 멈춘다. 25분을 다 돌린 뒤에야 알아채는 일이 없도록 한다. */
+let REDO=[];                 // 다시 시행한 블록
+let KEYCHK=null;             // 방향키 확인 진행 중일 때의 상태
+let KEYS_OK=false;           // 설정 화면에서 방향키가 확인되었는가
+
+function fsOn(){
+  const el=document.documentElement;
+  const fn=el.requestFullscreen||el.webkitRequestFullscreen;
+  try{ return fn ? (fn.call(el)||Promise.resolve()).catch(()=>{}) : Promise.resolve(); }
+  catch(e){ return Promise.resolve(); }
+}
+function fsOff(){
+  const fn=document.exitFullscreen||document.webkitExitFullscreen;
+  try{ if(fn && (document.fullscreenElement||document.webkitFullscreenElement)) fn.call(document); }catch(e){}
+}
+const inFS=()=>!!(document.fullscreenElement||document.webkitFullscreenElement);
+
+function keyCheck(hostId, onDone){
+  const host=$(hostId);
+  KEYCHK={got:{}, host:host, done:onDone};
+  paintKeyCheck();
+}
+function paintKeyCheck(){
+  if(!KEYCHK) return;
+  const g=KEYCHK.got;
+  KEYCHK.host.innerHTML=
+      '<span class="'+(g.ArrowLeft?'hit':'')+'">← 왼쪽 '+(g.ArrowLeft?'확인':'눌러 보세요')+'</span>'
+    + '<span class="'+(g.ArrowRight?'hit':'')+'">→ 오른쪽 '+(g.ArrowRight?'확인':'눌러 보세요')+'</span>';
+  if(g.ArrowLeft && g.ArrowRight){
+    const fn=KEYCHK.done; KEYCHK=null;
+    if(fn) setTimeout(fn,400);
+  }
+}
+
+function pauseBlock(reason){
+  if(!RUN || RUN.paused) return;
+  RUN.paused=true;
+  clearInterval(RUN.timer);
+  REDO.push({pid:P.pid, block:RUN.blockNo, cond:RUN.condName, reason:reason,
+             at:new Date().toISOString()});
+  $('pauseReason').textContent=reason;
+  $('pauseBox').hidden=false;
+  keyCheck('pauseKeys', resumeBlock);
+}
+function resumeBlock(){
+  $('pauseBox').hidden=true;
+  const o={cond:RUN.condName, setIdx:RUN.setIdx, blockNo:RUN.blockNo,
+           practice:RUN.practice, warmup:RUN.warmup, ms:RUN.ms};
+  RUN=null;
+  fsOn().then(()=>startBlock(o));     // 같은 자극 세트로 블록을 처음부터 다시
+}
+
+// 창이 보이는 채로 포커스만 잃는 경우는 visibilitychange 가 잡지 못한다.
+window.addEventListener('blur',()=>{
+  setTimeout(()=>{
+    if(RUN && !RUN.paused && !document.hasFocus())
+      pauseBlock('창이 활성 상태를 잃었습니다. 다른 창이나 알림을 누르면 방향키가 이 페이지로 오지 않습니다.');
+  },300);
+});
+document.addEventListener('fullscreenchange',()=>{
+  if(RUN && !RUN.paused && !inFS())
+    pauseBlock('전체 화면이 해제되었습니다. 실험 중에는 전체 화면을 유지해야 합니다.');
+});
+
 let HIDDEN_AT=null;
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden){ HIDDEN_AT=performance.now(); return; }
@@ -887,10 +976,15 @@ function closeAlert(key,tAbs){
     outcome:!key?'무응답':(key===want?'정답':'오답')
   };
   RUN.alerts.push(rec);
+  // 세 개를 내리 놓치면 키가 안 들어오고 있을 가능성이 크다.
+  RUN.missStreak = (rec.outcome==='무응답') ? (RUN.missStreak||0)+1 : 0;
+  if(RUN.missStreak>=3)
+    pauseBlock('알림 세 개에 연속으로 응답이 없었습니다. 방향키가 이 페이지로 들어오지 않는 상태일 수 있습니다.');
 }
 function onKey(e){
   if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight') return;
   e.preventDefault();
+  if(KEYCHK){ KEYCHK.got[e.key]=true; paintKeyCheck(); return; }
   const t=performance.now();
   if(RUN&&RUN.pending) closeAlert(e.key,t);
   else if(LEARN&&LEARN.waiting) learnAnswer(e.key,t);
@@ -1113,9 +1207,11 @@ function askTlx(cond){
 async function startRun(){
   readCfg(); readP();
   await armAudio();      // 브라우저는 클릭 없이는 소리를 내지 않는다. 시작 클릭에서 확실히 깨운다.
+  await fsOn();          // 다른 창을 덮어 포커스를 뺏길 여지를 줄인다. 거부돼도 그냥 진행한다.
+  KEYCHK=null;           // 설정 화면의 확인이 남아 본 시행의 키를 삼키지 않도록 한다.
   const r=mulberry32(4242+(P.seq||1));
   schedule=makeSchedule(r); order=makeOrder(r);
-  blocks=[]; trials=[]; tlx={}; practiceLog=[]; learnLog=[];
+  blocks=[]; trials=[]; tlx={}; practiceLog=[]; learnLog=[]; REDO=[];
   if(CFG.practice>0) startPractice(1);
   else if(MODE==='primary') beginMain();
   else { learnState={order:(P.seq%2===1?['visual','audio']:['audio','visual']), done:0, acc:{}};
@@ -1141,6 +1237,7 @@ function condAgg(c){
     rt: meanRt(tr), rtlx: tlx[c]? tlx[c].mean : ''};
 }
 function finish(){
+  fsOff();
   show('s-done'); setRail('종료');
   const agg={}; ['A','B','C','D','E'].forEach(c=>agg[c]=condAgg(c));
   // 표 D4 파생값
@@ -1266,6 +1363,7 @@ function buildCsv(agg, derived){
     숫자자릿수:CFG.digits, 표행수:CFG.rows, 블록길이s:CFG.blockMs/1000,
     블록당알림:CFG.nAlerts, 응답제한s:CFG.respMs/1000, 두열간격ch:CFG.colGap,
     시각알림위치:CFG.iconPos, 페이지판:BUILD,
+    블록재시행:REDO.length,
     실험일시:P.started, 실험자:P.experimenter
   }]);
   CSV['표 D2 블록별 기록']=toCsv(blocks.map(b=>({
@@ -1550,6 +1648,7 @@ $('btnSaveJson').onclick=()=>{ if(LAST) download(fileStem()+'.json', JSON.string
 /* ════════════ 시작 ════════════ */
 (function init(){
   $('buildTag').textContent='판 '+BUILD;
+  keyCheck('setupKeys', ()=>{ KEYS_OK=true; paintCloud(); });
   $('pid').addEventListener('input', paintSeq);
   paintSeq();
   $('btnSoundCheck').onclick=runSoundCheck;
@@ -1574,6 +1673,13 @@ $('btnSaveJson').onclick=()=>{ if(LAST) download(fileStem()+'.json', JSON.string
     $(id).addEventListener('input',readCfg); $(id).addEventListener('change',readCfg);
   });
   const toInstr=m=>{
+    if(!KEYS_OK){
+      // 방향키가 안 들어오는 상태로 25분을 돌리는 사고를 여기서 끊는다.
+      $('cloudStatus').innerHTML='<b style="color:var(--bad)">먼저 방향키를 확인해 주세요.</b> '
+        +'알림 확인 칸에서 ← 와 → 를 한 번씩 눌러야 시작할 수 있습니다.';
+      $('setupKeys').scrollIntoView({block:'center'});
+      return;
+    }
     MODE=m; readCfg(); readP();
     const bal=(m==='balance'), pri=(m==='primary');
     $('modeNote').hidden=!(bal||pri);
