@@ -355,17 +355,13 @@ ul.tight li{margin-bottom:4px}
       <h3>파일럿 3단계만 실행</h3>
       <p class="lede" style="margin-bottom:10px"><small><b>B·C 균형 점검</b> — 연습, 알림 학습(두 양식), B 시각 단독 2블록, C 청각 단독 2블록, 각 조건 뒤 RTLX. 약 15분.<br>
       <b>A 주 과업 난이도</b> — 주 과업 연습 뒤 <b>A 대조 단독만</b> 돌려 90초당 처리량이 6–10개에 들어오는지 봅니다. 알림이 없으므로 학습도 설문도 하지 않습니다. 약 8분.<br>
-      <b>A·D·E 이어서 하기</b> — B·C 만 마친 참가자가 <b>나머지 세 조건</b>을 이어서 합니다. 주 과업 연습은 하되 <b>알림 학습은 건너뜁니다</b>(이미 익힌 상태를 전제). 앞서 한 순서에 맞춰 Williams 시퀀스가 완성되도록 조건 차례가 정해집니다. 약 15분.</small></p>
+      <b>남은 세 조건 이어서 하기</b> — B·C 만 마친 참가자가 <b>나머지 세 조건</b>을 이어서 합니다. 주 과업 연습은 하되 <b>알림 학습은 건너뜁니다</b>(이미 익힌 상태를 전제). 조건 차례는 <b>참가자 번호로 자동</b>으로 정해져 Williams 시퀀스가 완성됩니다. 약 15분.</small></p>
       <div class="row">
         <button id="btnBalance">B·C 균형 점검만 실행</button>
         <button id="btnPrimary">A 주 과업 난이도만 확인</button>
       </div>
       <div class="row" style="margin-top:10px">
-        <button id="btnAde">A·D·E 이어서 하기 (B·C 완료자)</button>
-        <select id="cfgPrevBC" style="max-width:320px">
-          <option value="BC">앞서 B → C 순으로 함 → 이어서 A·D·E (BCADE = Q2)</option>
-          <option value="CB">앞서 C → B 순으로 함 → 이어서 D·A·E (CBDAE = Q10)</option>
-        </select>
+        <button id="btnAde">남은 세 조건 이어서 하기 (B·C 완료자)</button>
       </div>
     </div>
 
@@ -654,7 +650,7 @@ function shuffle(r,arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const 
 const $=id=>document.getElementById(id);
 let CFG={}, P={}, RUN=null;
 let MODE='full';
-const BUILD='2026-10-29 16:10';   // 배포 시각(UTC). 캐시된 옛 판으로 돌리는 일을 막기 위해 화면과 기록에 남긴다.          // 'full' = 전체 실험, 'balance' = 파일럿 3단계(B·C 균형 점검)
+const BUILD='2026-10-29 16:50';   // 배포 시각(UTC). 캐시된 옛 판으로 돌리는 일을 막기 위해 화면과 기록에 남긴다.          // 'full' = 전체 실험, 'balance' = 파일럿 3단계(B·C 균형 점검)
 let blocks=[], trials=[], tlx={}, practiceLog=[], learnLog=[];
 let schedule=[], order=[];
 
@@ -672,7 +668,6 @@ function readCfg(){
   if(CFG.gapMax<=CFG.gapMin) CFG.gapMax=CFG.gapMin+1;
   CFG.colGap=+$('cfgGap').value;
   CFG.iconPos=$('cfgIconPos').value;
-  CFG.prevBC=$('cfgPrevBC').value;
   $('stage').className='stage pos-'+CFG.iconPos;
   if($('posDiagram')) paintCheck();
   $('posNote').innerHTML = (CFG.iconPos==='top')
@@ -704,6 +699,10 @@ function numOfId(pid){
 }
 const seqOfNum = v => ((v-1)%10)+1;
 const balanceOrder = v => (v%2===0) ? ['B','C'] : ['C','B'];
+/* B·C 를 마친 사람이 이어서 할 차례. 앞서 한 순서가 번호로 이미 정해져 있으니
+   그 뒤에 붙여 Williams 시퀀스가 되는 쪽을 고르면 된다.
+   B·C → A·D·E = BCADE(Q2),  C·B → D·A·E = CBDAE(Q10). */
+const adeOrder = v => (v%2===0) ? ['A','D','E'] : ['D','A','E'];
 
 function readP(){
   const pid=$('pid').value.trim()||'P00';
@@ -723,7 +722,8 @@ function paintSeq(){
   const q=seqOfNum(num), bc=balanceOrder(num);
   el.innerHTML='참가자 번호 <b>'+num+'</b><br>'
     + '전체 실험 → <b>Q'+q+'</b> · '+WILLIAMS[q-1].join(' · ')+'<br>'
-    + 'B·C 점검 → <b>'+bc.join(' · ')+'</b>';
+    + 'B·C 점검 → <b>'+bc.join(' · ')+'</b>'
+    + ' · 이어서 → <b>'+adeOrder(num).join(' · ')+'</b>';
 }
 
 /* ════════════ 주 과업 자극 ════════════ */
@@ -1152,7 +1152,7 @@ function beginMain(){
   // (B·C → A·D·E = Q2,  C·B → D·A·E = Q10).
   const ord = (MODE==='balance') ? balanceOrder(P.num)
             : (MODE==='primary') ? ['A']
-            : (MODE==='ade') ? ((CFG.prevBC==='CB') ? ['D','A','E'] : ['A','D','E'])
+            : (MODE==='ade') ? adeOrder(P.num)
             : WILLIAMS[P.seq-1];
   // 난이도 점검은 A 한 조건을 여러 블록 돌린다. 나머지 모드는 조건마다 두 블록.
   MAIN={condIdx:0, blockInCond:0, blockNo:0, order:ord, warmed:false,
@@ -1789,7 +1789,7 @@ $('btnSaveJson').onclick=()=>{ if(LAST) download(fileStem()+'.json', JSON.string
     $('modeNote').hidden=!(bal||pri||ade);
     if(ade) $('modeNote').innerHTML='<b>A·D·E 이어서 하기</b>입니다. 앞서 B·C 를 마친 참가자용이며 '
       +'<b>알림 학습을 건너뜁니다.</b> 아이콘과 알림음이 무엇을 뜻하는지 기억나지 않으면 '
-      +'<b>지금 실험자에게 말하세요.</b> 조건 차례는 '+((CFG.prevBC==='CB')?'D → A → E':'A → D → E')+' 입니다.';
+      +'<b>지금 실험자에게 말하세요.</b> 조건 차례는 '+adeOrder(P.num).join(' → ')+' 입니다.';
     else
     if(pri) $('modeNote').innerHTML='<b>A 주 과업 난이도 확인</b>입니다. 대조 검증만 '+
       CFG.primaryBlocks+'블록 수행하며 <b>알림은 제시되지 않습니다.</b> 설문도 없습니다. '+
