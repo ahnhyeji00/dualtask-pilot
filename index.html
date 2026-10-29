@@ -354,10 +354,18 @@ ul.tight li{margin-bottom:4px}
     <div class="card flat">
       <h3>파일럿 3단계만 실행</h3>
       <p class="lede" style="margin-bottom:10px"><small><b>B·C 균형 점검</b> — 연습, 알림 학습(두 양식), B 시각 단독 2블록, C 청각 단독 2블록, 각 조건 뒤 RTLX. 약 15분.<br>
-      <b>A 주 과업 난이도</b> — 주 과업 연습 뒤 <b>A 대조 단독만</b> 돌려 90초당 처리량이 6–10개에 들어오는지 봅니다. 알림이 없으므로 학습도 설문도 하지 않습니다. 약 8분.</small></p>
+      <b>A 주 과업 난이도</b> — 주 과업 연습 뒤 <b>A 대조 단독만</b> 돌려 90초당 처리량이 6–10개에 들어오는지 봅니다. 알림이 없으므로 학습도 설문도 하지 않습니다. 약 8분.<br>
+      <b>A·D·E 이어서 하기</b> — B·C 만 마친 참가자가 <b>나머지 세 조건</b>을 이어서 합니다. 주 과업 연습은 하되 <b>알림 학습은 건너뜁니다</b>(이미 익힌 상태를 전제). 앞서 한 순서에 맞춰 Williams 시퀀스가 완성되도록 조건 차례가 정해집니다. 약 15분.</small></p>
       <div class="row">
         <button id="btnBalance">B·C 균형 점검만 실행</button>
         <button id="btnPrimary">A 주 과업 난이도만 확인</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button id="btnAde">A·D·E 이어서 하기 (B·C 완료자)</button>
+        <select id="cfgPrevBC" style="max-width:320px">
+          <option value="BC">앞서 B → C 순으로 함 → 이어서 A·D·E (BCADE = Q2)</option>
+          <option value="CB">앞서 C → B 순으로 함 → 이어서 D·A·E (CBDAE = Q10)</option>
+        </select>
       </div>
     </div>
 
@@ -646,7 +654,7 @@ function shuffle(r,arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const 
 const $=id=>document.getElementById(id);
 let CFG={}, P={}, RUN=null;
 let MODE='full';
-const BUILD='2026-10-29 10:26';   // 배포 시각(UTC). 캐시된 옛 판으로 돌리는 일을 막기 위해 화면과 기록에 남긴다.          // 'full' = 전체 실험, 'balance' = 파일럿 3단계(B·C 균형 점검)
+const BUILD='2026-10-29 16:10';   // 배포 시각(UTC). 캐시된 옛 판으로 돌리는 일을 막기 위해 화면과 기록에 남긴다.          // 'full' = 전체 실험, 'balance' = 파일럿 3단계(B·C 균형 점검)
 let blocks=[], trials=[], tlx={}, practiceLog=[], learnLog=[];
 let schedule=[], order=[];
 
@@ -664,6 +672,7 @@ function readCfg(){
   if(CFG.gapMax<=CFG.gapMin) CFG.gapMax=CFG.gapMin+1;
   CFG.colGap=+$('cfgGap').value;
   CFG.iconPos=$('cfgIconPos').value;
+  CFG.prevBC=$('cfgPrevBC').value;
   $('stage').className='stage pos-'+CFG.iconPos;
   if($('posDiagram')) paintCheck();
   $('posNote').innerHTML = (CFG.iconPos==='top')
@@ -814,7 +823,7 @@ function iconSvg(id,cls){
 const SECTIONS=['s-setup','s-instr','s-run','s-learn','s-rest','s-tlx','s-done','s-hist','s-cloud'];
 function show(id){ SECTIONS.forEach(s=>$(s).hidden=(s!==id)); window.scrollTo(0,0); }
 function setRail(stage){
-  const main = (MODE==='balance') ? 'B·C 점검' : (MODE==='primary') ? 'A 난이도' : '본 시행';
+  const main = (MODE==='balance') ? 'B·C 점검' : (MODE==='primary') ? 'A 난이도' : (MODE==='ade') ? 'A·D·E' : '본 시행';
   const steps=['설정','지시문','연습','학습',main,'종료'];
   const i=steps.indexOf(stage==='본 시행'?main:stage);
   $('rail').hidden=false;
@@ -1138,8 +1147,12 @@ function rest(sec,title,note,then){
 let MAIN={condIdx:0, blockInCond:0, blockNo:0, order:[]};
 function beginMain(){
   // 균형 점검 모드에서는 알림 단독 두 조건만 수행하고, 순서는 참가자 사이에서 교대한다.
+  // B·C 를 이미 마친 참가자는 남은 세 조건만 한다. 앞서 한 순서에 따라
+  // 이어붙였을 때 Williams 시퀀스가 되도록 차례를 정한다
+  // (B·C → A·D·E = Q2,  C·B → D·A·E = Q10).
   const ord = (MODE==='balance') ? balanceOrder(P.num)
             : (MODE==='primary') ? ['A']
+            : (MODE==='ade') ? ((CFG.prevBC==='CB') ? ['D','A','E'] : ['A','D','E'])
             : WILLIAMS[P.seq-1];
   // 난이도 점검은 A 한 조건을 여러 블록 돌린다. 나머지 모드는 조건마다 두 블록.
   MAIN={condIdx:0, blockInCond:0, blockNo:0, order:ord, warmed:false,
@@ -1172,8 +1185,10 @@ function advance(fin){
       rest(CFG.restBlock,'주 과업 연습 종료',
         (MODE==='primary')
           ? ('블록당 평균 '+tot.toFixed(1)+'개. 이어서 기록되는 블록을 '+CFG.primaryBlocks+'회 수행합니다.')
+          : (MODE==='ade')
+          ? ('블록당 평균 '+tot.toFixed(1)+'개. 이어서 남은 세 조건을 수행합니다.')
           : ('블록당 평균 '+tot.toFixed(1)+'개. 이어서 알림 분류를 학습합니다.'),
-        (MODE==='primary') ? beginMain
+        (MODE==='primary'||MODE==='ade') ? beginMain
           : ()=>{ learnState={order:(P.seq%2===1?['visual','audio']:['audio','visual']), done:0, acc:{}};
                   startLearn(learnState.order[0],1); });
     }
@@ -1231,7 +1246,7 @@ async function startRun(){
   schedule=makeSchedule(r); order=makeOrder(r);
   blocks=[]; trials=[]; tlx={}; practiceLog=[]; learnLog=[]; REDO=[]; SENT=0;
   if(CFG.practice>0) startPractice(1);
-  else if(MODE==='primary') beginMain();
+  else if(MODE==='primary'||MODE==='ade') beginMain();
   else { learnState={order:(P.seq%2===1?['visual','audio']:['audio','visual']), done:0, acc:{}};
          startLearn(learnState.order[0],1); }
 }
@@ -1770,8 +1785,12 @@ $('btnSaveJson').onclick=()=>{ if(LAST) download(fileStem()+'.json', JSON.string
       return;
     }
     MODE=m; readCfg(); readP();
-    const bal=(m==='balance'), pri=(m==='primary');
-    $('modeNote').hidden=!(bal||pri);
+    const bal=(m==='balance'), pri=(m==='primary'), ade=(m==='ade');
+    $('modeNote').hidden=!(bal||pri||ade);
+    if(ade) $('modeNote').innerHTML='<b>A·D·E 이어서 하기</b>입니다. 앞서 B·C 를 마친 참가자용이며 '
+      +'<b>알림 학습을 건너뜁니다.</b> 아이콘과 알림음이 무엇을 뜻하는지 기억나지 않으면 '
+      +'<b>지금 실험자에게 말하세요.</b> 조건 차례는 '+((CFG.prevBC==='CB')?'D → A → E':'A → D → E')+' 입니다.';
+    else
     if(pri) $('modeNote').innerHTML='<b>A 주 과업 난이도 확인</b>입니다. 대조 검증만 '+
       CFG.primaryBlocks+'블록 수행하며 <b>알림은 제시되지 않습니다.</b> 설문도 없습니다. '+
       '평소 속도로, 틀리지 않게 수행해 주세요.';
@@ -1785,6 +1804,7 @@ $('btnSaveJson').onclick=()=>{ if(LAST) download(fileStem()+'.json', JSON.string
   $('btnToInstr').onclick=()=>toInstr('full');
   $('btnBalance').onclick=()=>toInstr('balance');
   $('btnPrimary').onclick=()=>toInstr('primary');
+  $('btnAde').onclick=()=>toInstr('ade');
   $('btnBackSetup').onclick=()=>{ show('s-setup'); setRail('설정'); };
   $('btnToPractice').onclick=startRun;
   $('btnNewRun').onclick=()=>{
