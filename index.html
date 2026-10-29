@@ -335,6 +335,15 @@ ul.tight li{margin-bottom:4px}
         <button id="btnRestore">이 기기 기록</button>
       </div>
       <p style="margin:10px 0 0"><small class="lede" id="cloudStatus"></small></p>
+      <div class="note warn" id="recoverBox" hidden>
+        <b>끝까지 저장되지 않은 실행이 남아 있습니다.</b>
+        <span id="recoverWho"></span><br>
+        아래 버튼을 누르면 그 자료로 결과 화면을 만들어 <b>파일 저장과 시트 전송</b>을 다시 시도합니다.
+        <div class="row" style="margin-top:10px">
+          <button class="primary" id="btnRecover">직전 실행 복구</button>
+          <button id="btnDropRecover">버리기</button>
+        </div>
+      </div>
       <div style="margin-top:12px">
         <label for="cfgEndpoint">수집 주소 (선택 사항 — 비워 두어도 됩니다)</label>
         <input id="cfgEndpoint" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
@@ -479,6 +488,10 @@ ul.tight li{margin-bottom:4px}
     <div class="card">
       <h2>기록 완료</h2>
       <div class="note" id="saveState">저장 중…</div>
+      <div class="note warn">
+        <b>다운로드 폴더에 <code>.json</code> 파일이 생겼는지 확인하세요.</b>
+        없으면 아래 <b>결과 파일 다시 저장</b>을 눌러 주세요. 브라우저가 자동 저장을 막는 경우가 있습니다.
+      </div>
       <p class="lede">아래 표를 복사해 .csv 파일로 저장할 수도 있습니다.</p>
       <div class="note warn">사후 인터뷰를 진행하세요 — 두 과업 사이에 어떤 전략으로 주의를 배분했는지, 어느 조건이 가장 부담스러웠는지 묻고 기록합니다.</div>
       <div class="tabs" id="csvTabs"></div>
@@ -633,7 +646,7 @@ function shuffle(r,arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const 
 const $=id=>document.getElementById(id);
 let CFG={}, P={}, RUN=null;
 let MODE='full';
-const BUILD='2026-10-26 00:27';   // 배포 시각(UTC). 캐시된 옛 판으로 돌리는 일을 막기 위해 화면과 기록에 남긴다.          // 'full' = 전체 실험, 'balance' = 파일럿 3단계(B·C 균형 점검)
+const BUILD='2026-10-29 10:26';   // 배포 시각(UTC). 캐시된 옛 판으로 돌리는 일을 막기 위해 화면과 기록에 남긴다.          // 'full' = 전체 실험, 'balance' = 파일럿 3단계(B·C 균형 점검)
 let blocks=[], trials=[], tlx={}, practiceLog=[], learnLog=[];
 let schedule=[], order=[];
 
@@ -880,9 +893,14 @@ function fsOn(){
   try{ return fn ? (fn.call(el)||Promise.resolve()).catch(()=>{}) : Promise.resolve(); }
   catch(e){ return Promise.resolve(); }
 }
-function fsOff(){
+async function fsOff(){
   const fn=document.exitFullscreen||document.webkitExitFullscreen;
-  try{ if(fn && (document.fullscreenElement||document.webkitFullscreenElement)) fn.call(document); }catch(e){}
+  try{
+    if(fn && (document.fullscreenElement||document.webkitFullscreenElement)){
+      await (fn.call(document)||Promise.resolve());
+      await new Promise(r=>setTimeout(r,250));
+    }
+  }catch(e){}
 }
 const inFS=()=>!!(document.fullscreenElement||document.webkitFullscreenElement);
 
@@ -1009,7 +1027,7 @@ function endBlock(){
   };
   if(RUN.warmup){ /* 조건별 연습 — 기록하지 않는다 */ }
   else if(RUN.practice) practiceLog.push(rec);
-  else { blocks.push(rec); trials.push(...RUN.alerts); }
+  else { blocks.push(rec); trials.push(...RUN.alerts); saveProgress(); sendBlock(rec, RUN.alerts); }
   const finished=RUN;
   RUN=null;
   advance(finished);
@@ -1196,7 +1214,7 @@ function askTlx(cond){
     const vals={}; let sum=0;
     TLX_ITEMS.forEach(it=>{const v=+$('r_'+it.k).value; vals[it.k]=v; sum+=v;});
     vals.mean=+(sum/6).toFixed(2);
-    tlx[cond]=vals;
+    tlx[cond]=vals; saveProgress();
     MAIN.condIdx++; MAIN.blockInCond=0; MAIN.warmed=false;
     if(MAIN.condIdx>=MAIN.order.length){ finish(); }
     else rest(CFG.restCond,'조건 간 휴식',
@@ -1211,7 +1229,7 @@ async function startRun(){
   KEYCHK=null;           // 설정 화면의 확인이 남아 본 시행의 키를 삼키지 않도록 한다.
   const r=mulberry32(4242+(P.seq||1));
   schedule=makeSchedule(r); order=makeOrder(r);
-  blocks=[]; trials=[]; tlx={}; practiceLog=[]; learnLog=[]; REDO=[];
+  blocks=[]; trials=[]; tlx={}; practiceLog=[]; learnLog=[]; REDO=[]; SENT=0;
   if(CFG.practice>0) startPractice(1);
   else if(MODE==='primary') beginMain();
   else { learnState={order:(P.seq%2===1?['visual','audio']:['audio','visual']), done:0, acc:{}};
@@ -1236,8 +1254,8 @@ function condAgg(c){
     wrongRate: pres? +(100*wr/pres).toFixed(1):'', missRate: pres? +(100*ms/pres).toFixed(1):'',
     rt: meanRt(tr), rtlx: tlx[c]? tlx[c].mean : ''};
 }
-function finish(){
-  fsOff();
+async function finish(){
+  await fsOff();        // 전체 화면 상태에서 시작된 내려받기는 브라우저가 막을 수 있다
   show('s-done'); setRail('종료');
   const agg={}; ['A','B','C','D','E'].forEach(c=>agg[c]=condAgg(c));
   // 표 D4 파생값
@@ -1257,7 +1275,8 @@ function finish(){
   if(MODE==='balance') renderVerdict(agg);
   else if(MODE==='primary') renderPrimaryVerdict();
   saveLocal(agg, derived);
-  saveCloud(agg, derived);
+  await saveCloud(agg, derived);
+  clearProgress();
 }
 
 /* ── 파일럿 3단계 판정 ── */
@@ -1353,6 +1372,41 @@ const CSV={};
 function q(v){ const s=String(v??''); return /[",\n]/.test(s)? '"'+s.replace(/"/g,'""')+'"' : s; }
 function toCsv(rows){ if(!rows.length) return '';
   const k=Object.keys(rows[0]); return [k.join(',')].concat(rows.map(r=>k.map(x=>q(r[x])).join(','))).join('\n'); }
+const blockRow=b=>({
+  참가자ID:b.pid, 블록:b.block, 조건:b.cond, 자극세트:'S'+b.set,
+  처리량:b.throughput, 오클릭:b.misclicks, 표당소요s:b.secPerTable,
+  알림제시:b.presented, 분류정답:b.correct, 분류오답:b.wrong, 무응답:b.missed,
+  평균반응시간s:b.meanRt, 창전환ms:b.hiddenMs
+});
+const trialRow=t=>({
+  참가자ID:t.pid, 블록:t.block, 조건:t.cond, 자극세트:'S'+t.set, 순번:t.idx,
+  자극:t.stim, 범주:t.cat, 양식:t.modality, 제시시점ms:t.onsetMs,
+  응답키:t.response, 반응시간ms:t.rtMs, 판정:t.outcome
+});
+
+/* 블록이 끝날 때마다 그 블록만 시트로 보낸다. 맨 끝에 한 번만 보내면
+   중간에 창을 닫거나 전송이 실패할 때 25분이 통째로 사라진다.
+   같은 행을 두 번 넣지 않도록 최종 전송에서는 이 두 표를 뺀다. */
+let SENT=0;
+async function sendBlock(rec, alerts){
+  if(!ENDPOINT) return;
+  const body={
+    pid:P.pid, seq:P.seq, mode:MODE, experimenter:P.experimenter||'',
+    toneset:CFG.toneset||'', conditions:'진행중 '+blocks.length+'블록',
+    startedAt:P.started, finishedAt:new Date().toISOString(),
+    blocks:blocks.length, trialCount:trials.length,
+    partial:true, summary:{}, derived:{},
+    csv:{ '표 D2 블록별 기록': toCsv([blockRow(rec)]),
+          '알림 시행 로그': alerts.length? toCsv(alerts.map(trialRow)) : '' }
+  };
+  try{
+    await fetch(ENDPOINT,{method:'POST', mode:'no-cors',
+      headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(body)});
+    SENT++;
+  }catch(e){}
+  if($('runTag')) $('runTag').title='서버로 보낸 블록 '+SENT+'개';
+}
+
 function buildCsv(agg, derived){
   CSV['표 D1 참가자 정보']=toCsv([{
     참가자ID:P.pid, 시퀀스:P.seq, 주사용손:P.hand, 성별:P.sex, 연령:P.age,
@@ -1366,12 +1420,7 @@ function buildCsv(agg, derived){
     블록재시행:REDO.length,
     실험일시:P.started, 실험자:P.experimenter
   }]);
-  CSV['표 D2 블록별 기록']=toCsv(blocks.map(b=>({
-    참가자ID:b.pid, 블록:b.block, 조건:b.cond, 자극세트:'S'+b.set,
-    처리량:b.throughput, 오클릭:b.misclicks, 표당소요s:b.secPerTable,
-    알림제시:b.presented, 분류정답:b.correct, 분류오답:b.wrong, 무응답:b.missed, 평균반응시간s:b.meanRt,
-    창전환ms:b.hiddenMs
-  })));
+  CSV['표 D2 블록별 기록']=toCsv(blocks.map(blockRow));
   CSV['표 D3 조건별 RTLX']=toCsv(['A','B','C','D','E'].filter(c=>tlx[c]).map(c=>({
     참가자ID:P.pid, 조건:c, 정신적요구:tlx[c].mental, 신체적요구:tlx[c].physical,
     시간적요구:tlx[c].temporal, 수행:tlx[c].perf, 노력:tlx[c].effort, 좌절:tlx[c].frust, 평균:tlx[c].mean
@@ -1382,11 +1431,7 @@ function buildCsv(agg, derived){
     '분류비용D-B_s':derived.costDB, '분류비용E-C_s':derived.costEC,
     'RTLX_D':derived.rtlxD, 'RTLX_E':derived.rtlxE
   }]);
-  CSV['알림 시행 로그']=toCsv(trials.map(t=>({
-    참가자ID:t.pid, 블록:t.block, 조건:t.cond, 자극세트:'S'+t.set, 순번:t.idx,
-    자극:t.stim, 범주:t.cat, 양식:t.modality, 제시시점ms:t.onsetMs,
-    응답키:t.response, 반응시간ms:t.rtMs, 판정:t.outcome
-  })));
+  CSV['알림 시행 로그']=toCsv(trials.map(trialRow));
   CSV['학습 로그']=toCsv(learnLog.map(l=>({
     참가자ID:l.pid, 양식:l.modality, 학습블록:l.learnBlock, 문항:l.item,
     자극:l.stim, 응답키:l.response, 반응시간ms:l.rtMs, 정답여부:l.correct
@@ -1459,6 +1504,36 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 const setCloudStatus=t=>{ const e=$('cloudStatus'); if(e) e.innerHTML=t; };
 
 const EP_KEY='dualtask.endpoint';
+const PROG_KEY='dualtask.progress';
+
+/* 저장이 맨 끝에 한 번만 일어나면, 중간에 창을 닫거나 브라우저가 죽을 때
+   25분이 통째로 사라진다. 블록이 끝날 때마다 이 기기에 적어 둔다. */
+function saveProgress(){
+  try{
+    localStorage.setItem(PROG_KEY, JSON.stringify({
+      v:1, at:new Date().toISOString(), build:BUILD,
+      pid:P.pid, num:P.num, seq:P.seq, mode:MODE, cfg:CFG, started:P.started,
+      person:{hand:P.hand,sex:P.sex,age:P.age,sleep:P.sleep,caffeine:P.caffeine,
+              vision:P.vision,colorv:P.colorv,hearing:P.hearing,experimenter:P.experimenter},
+      order:(MAIN&&MAIN.order)||[], blocks:blocks, trials:trials, tlx:tlx,
+      learnLog:learnLog, practiceLog:practiceLog, redo:REDO, learnAcc:learnState.acc
+    }));
+  }catch(e){}
+}
+function clearProgress(){ try{ localStorage.removeItem(PROG_KEY); }catch(e){} }
+function readProgress(){
+  try{ const r=localStorage.getItem(PROG_KEY); return r? JSON.parse(r): null; }catch(e){ return null; }
+}
+function restoreProgress(){
+  const g=readProgress(); if(!g) return;
+  P={pid:g.pid, num:g.num||1, seq:g.seq||1, started:g.started, ...(g.person||{})};
+  CFG=g.cfg||CFG; MODE=g.mode||'full'; TONESET=CFG.toneset||'dir';
+  blocks=g.blocks||[]; trials=g.trials||[]; tlx=g.tlx||{};
+  learnLog=g.learnLog||[]; practiceLog=g.practiceLog||[]; REDO=g.redo||[];
+  learnState={order:[], done:0, acc:g.learnAcc||{}};
+  MAIN={condIdx:0, blockInCond:0, blockNo:(g.blocks||[]).length, order:g.order||[], perCond:2, warmed:false};
+  finish();
+}
 function loadEndpoint(){
   try{ ENDPOINT=localStorage.getItem(EP_KEY)||DEFAULT_ENDPOINT; }catch(e){ ENDPOINT=DEFAULT_ENDPOINT; }
   const f=$('cfgEndpoint'); if(f) f.value=ENDPOINT;
@@ -1491,6 +1566,12 @@ function runPayload(agg, derived){
     summary:agg, derived:derived, csv:Object.assign({},CSV) };
 }
 let LAST=null;
+// 블록 단위로 이미 올린 두 표는 최종 전송에서 뺀다. 내려받는 파일에는 그대로 남긴다.
+function uploadBody(p){
+  const c=Object.assign({},p.csv);
+  if(SENT>0){ delete c['표 D2 블록별 기록']; delete c['알림 시행 로그']; }
+  return Object.assign({},p,{csv:c, partial:false});
+}
 
 async function saveCloud(agg, derived){
   LAST=runPayload(agg, derived);
@@ -1509,7 +1590,7 @@ async function saveCloud(agg, derived){
   try{
     await fetch(ENDPOINT, {method:'POST', mode:'no-cors',
       headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify(LAST)});
+      body:JSON.stringify(uploadBody(LAST))});
     // 브라우저 보안 때문에 응답을 읽을 수 없으므로 도착 여부는 단정하지 않는다.
     el.innerHTML+='<br>수집 주소로 전송을 보냈습니다. 도착 여부는 시트에서 확인하세요.';
   }catch(e){
@@ -1648,6 +1729,14 @@ $('btnSaveJson').onclick=()=>{ if(LAST) download(fileStem()+'.json', JSON.string
 /* ════════════ 시작 ════════════ */
 (function init(){
   $('buildTag').textContent='판 '+BUILD;
+  const g=readProgress();
+  if(g && g.blocks && g.blocks.length){
+    $('recoverBox').hidden=false;
+    $('recoverWho').textContent=' — '+g.pid+' · 블록 '+g.blocks.length+'개 · '
+      + new Date(g.at).toLocaleString('ko-KR');
+    $('btnRecover').onclick=()=>restoreProgress();
+    $('btnDropRecover').onclick=()=>{ clearProgress(); $('recoverBox').hidden=true; };
+  }
   keyCheck('setupKeys', ()=>{ KEYS_OK=true; paintCloud(); });
   $('pid').addEventListener('input', paintSeq);
   paintSeq();
